@@ -538,6 +538,27 @@ const CN_CAND_COLORS={
 };
 function cnCandColor(cedula){ return CN_CAND_COLORS[String(cedula)]||'#94a3b8'; }
 
+// Orientación de cada candidato de la Consulta Interpartidista 2026 (por partido)
+const CN_CAND_ORIENT={
+  '25280205':'Derecha',      // Paloma Valencia (Centro Democrático)
+  '79941641':'Centro',       // Juan Daniel Oviedo
+  '79589617':'Centro',       // Juan Manuel Galán (Nuevo Liberalismo)
+  '79593847':'Derecha',      // Juan Carlos Pinzón (Conservador)
+  '66918051':'Centro',       // Victoria Dávila
+  '19333686':'Centro',       // Enrique Peñalosa (Liberal)
+  '70566243':'Centro',       // Aníbal Gaviria (Liberal)
+  '79777591':'Derecha',      // David Luna (Cambio Radical)
+  '79154695':'Centro',       // Mauricio Cárdenas (Liberal)
+  '51992648':'Centro',       // Claudia López (Alianza Verde)
+  '10004127':'Centro',       // Claudia Nayibe López
+  '79289575':'Izquierda',    // Roy Barreras (ex Pacto Histórico)
+  '71386360':'Izquierda',    // Daniel Quintero (Colombia Humana)
+  '8701424' :'Centro',       // Edison Torres
+  '1023871966':'Centro',     // Martha Bernal
+  '7475736' :'Centro',       // Héctor Pineda
+};
+function cnCandOrient(cedula){ return CN_CAND_ORIENT[String(cedula)]||'Centro'; }
+
 async function fetchCNDeptData(){
   const ambs=Object.entries(AMB_TO_DPTO).filter(([,v])=>v);
   const results=await Promise.allSettled(
@@ -564,7 +585,7 @@ async function fetchCNDeptData(){
   return byDpto;
 }
 
-function paintCNMapByCand(map,oldLayer,side){
+function paintCNMapByCand(map,oldLayer,side,orient='todas'){
   if(oldLayer) map.removeLayer(oldLayer);
   removeLegend(map,side);
   if(!GEO||!API_CN_DEPT_WINNERS) return null;
@@ -573,10 +594,10 @@ function paintCNMapByCand(map,oldLayer,side){
   for(const [dpto,d] of Object.entries(API_CN_DEPT_WINNERS)){
     const ru=d.runnerUp;
     if(!ru) continue;
+    const ruOrient=cnCandOrient(ru.cedula);
+    if(orient!=='todas' && ruOrient!==orient) continue;
     const totalVots=d.all.reduce((s,c)=>s+c.vot,0);
     const w1=d.winner;
-    // Tooltip muestra 1º y 2º; color y nombre del 2º
-    // Tooltip para el mapa CN: el 'extra' contiene los datos del 1er candidato
     winners[dpto]={
       name:`2° ${ru.name}`,
       color:cnCandColor(ru.cedula),
@@ -1033,7 +1054,7 @@ function renderPresidencia(orient){
   document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
   document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
   layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
-  layerR=paintCNMapByCand(mapR,layerR,'right');
+  layerR=paintCNMapByCand(mapR,layerR,'right',orient);
 
   document.getElementById('lp-title').textContent='Presidencial 2022';
   document.getElementById('lp-nat-title').textContent='Votos nacionales — 1ª Vuelta 2022';
@@ -1100,13 +1121,14 @@ function renderConsultaPH(corp,orient){
     // Izquierda: Consulta PH 2025 Presidencia | Derecha: Consulta Interpartidista 2026 EN VIVO
     document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
-    layerL=paintPHMap(mapL,layerL,ph,'left'); // ← fix: paint left map with PH 2025 presidential data
-    layerR=paintCNMapByCand(mapR,layerR,'right');
+    layerL=paintPHMap(mapL,layerL,ph,'left',orient);
+    layerR=paintCNMapByCand(mapR,layerR,'right',orient);
 
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('lp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
     resetPhColors();
     const cPH=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos)
+      .filter(c=>orient==='todas'||(c.orientacion||'')===orient)
       .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
     switchToVBar(chartLNat);
     fillChartNumbered(chartLNat,cPH.slice(0,12),document.getElementById('lp-nat-legend'));
@@ -1128,7 +1150,7 @@ function renderConsultaPH(corp,orient){
   document.getElementById('left-title').textContent=`PH Consulta 2025 — ${phLbl}`;
   document.getElementById('right-title').textContent=`Congreso 2026 EN VIVO — ${phLabels[liveCorp]||liveCorp}`;
 
-  layerL=paintPHMap(mapL,layerL,ph,'left');
+  layerL=paintPHMap(mapL,layerL,ph,'left',orient);
   layerR=paintLiveMap(mapR,layerR,liveCorp==='senado'?API_SE:API_CA,orient,'right');
 
   document.getElementById('lp-title').textContent=`PH Consulta 2025 — ${phLbl}`;
@@ -1194,24 +1216,25 @@ function paintHistMap(map,oldLayer,departamentos,orient,side,isCandidato){
   return layer;
 }
 
-function paintPHMap(map,oldLayer,ph,side){
+function paintPHMap(map,oldLayer,ph,side,orient='todas'){
   if(oldLayer) map.removeLayer(oldLayer);
   removeLegend(map,side);
   if(!GEO) return null;
-  resetPhColors(); // reiniciar asignación de colores únicos por candidato
-  // Primera pasada: detectar todos los candidatos y pre-asignar colores
+  resetPhColors();
   const allCands=new Set();
   for(const arr of Object.values(ph.departamentos)){
     if(arr) for(const c of arr) allCands.add(c.candidato||c.partido);
   }
-  allCands.forEach(name=>phCandidateColor(name)); // pre-asigna orden consistente
+  allCands.forEach(name=>phCandidateColor(name));
   const winners={};
   for(const [rawDept,arr] of Object.entries(ph.departamentos)){
     const dpto=HIST_TO_DPTO[pad2(rawDept)]||pad2(rawDept);
     if(!arr||!arr.length) continue;
     const sorted=[...arr].sort((a,b)=>b.votos-a.votos);
-    const total=sorted.reduce((s,p)=>s+p.votos,0);
     const top=sorted[0];
+    // Filtrar por orientación del candidato/partido ganador
+    if(orient!=='todas' && (top.orientacion||'')!==orient) continue;
+    const total=sorted.reduce((s,p)=>s+p.votos,0);
     const name=top.candidato||top.partido;
     const pct=total>0?(top.votos/total)*100:0;
     winners[dpto]={name,color:phCandidateColor(name),pct,arr:sorted,vot:top.votos};
