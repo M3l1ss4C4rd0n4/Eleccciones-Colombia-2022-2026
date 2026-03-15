@@ -1559,7 +1559,10 @@ function computeEstimatedCurules(liveData, totalSeats, umbral, orient) {
   if(!liveData) return [];
   const cam = liveData.camaras?.[0];
   if(!cam?.partotabla) return [];
-  const tot = parseInt(cam.totales?.act?.votcan||0);
+  // totales.act.votcan is populated for national (amb=00) calls but often 0/null
+  // for dept-level calls — fall back to summing party votes.
+  const tot = parseInt(cam.totales?.act?.votcan||0) ||
+              cam.partotabla.reduce((s,p)=>s+parseInt(p.act?.vot||0),0);
   if(!tot) return [];
   const thresh = tot * umbral;
   // D'Hondt ALWAYS runs on ALL parties above the threshold (ignoring orientation),
