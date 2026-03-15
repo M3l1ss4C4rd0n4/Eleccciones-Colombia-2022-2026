@@ -1537,7 +1537,9 @@ async function fetchAndShowDeptLive(dpto){
       const party=getParty(a.codpar);
       for(const c of (a.cantotabla||[])){
         const vot=parseInt(c.vot||0);
-        if(vot>0) cands2026.push({label:`${c.nomcan||''} ${c.apecan||''}`.trim(),value:vot,color:party.c});
+        const name=`${c.nomcan||''} ${c.apecan||''}`.trim();
+        const esSoloLista=!name||/solo\s+por|por\s+la\s+lista/i.test(name);
+        if(vot>0 && !esSoloLista) cands2026.push({label:name,value:vot,color:party.c});
       }
     }
     cands2026.sort((a,b)=>b.value-a.value);
@@ -1667,7 +1669,10 @@ function getTop10NationalCandidates2022(corp){
     .slice(0,10);
 }
 
-// Top 10 candidatos más votados a nivel nacional desde API live (cantotabla dentro de partotabla)
+// Top 10 candidatos más votados a nivel nacional desde API live (cantotabla dentro de partotabla).
+// NOTA: La API de Registraduría solo incluye cantotabla (candidatos) en llamadas por departamento.
+// Para Senado (circunscripción nacional) sí hay candidatos a nivel nacional.
+// Para Cámara (circunscripciones departamentales) el nivel nacional no incluye candidatos → retorna [].
 function getLiveNationalCandidates(corp){
   const liveData = corp==='senado' ? API_SE : API_CA;
   if(!liveData) return [];
@@ -1678,11 +1683,10 @@ function getLiveNationalCandidates(corp){
     const party = getParty(p.act.codpar);
     for(const c of (p.act.cantotabla||[])){
       const vot = parseInt(c.vot||0);
-      if(vot>0) all.push({
-        label:`${c.nomcan||''} ${c.apecan||''}`.trim(),
-        value:vot,
-        color:party.c
-      });
+      const name = `${c.nomcan||''} ${c.apecan||''}`.trim();
+      // Filtrar votos de lista sin candidato («SOLO POR LA LISTA»)
+      const esSoloLista = !name || /solo\s+por|por\s+la\s+lista/i.test(name);
+      if(vot>0 && !esSoloLista) all.push({label:name, value:vot, color:party.c});
     }
   }
   return all.sort((a,b)=>b.value-a.value).slice(0,10);
