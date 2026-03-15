@@ -535,7 +535,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     render();
   });
 });
-document.getElementById('sel-corp').addEventListener('change', () => fetchLiveData());
+document.getElementById('sel-corp').addEventListener('change', () => render());
 document.getElementById('sel-ph-type').addEventListener('change', () => render());
 document.getElementById('sel-orient').addEventListener('change', () => render());
 
@@ -574,19 +574,19 @@ async function loadHistorico() {
 }
 
 async function fetchLiveData() {
-  const corp = document.getElementById('sel-corp').value;
-  const path = corp==='senado' ? 'ACT/SE/00' : 'ACT/CA/00';
   setStatus('Actualizando\u2026','#4f8ef7');
   show('right-spinner',true);
   try {
-    const r = await fetch(`/api/registraduria_proxy.py?path=${path}`);
-    if(!r.ok) {
-      const errBody = await r.json().catch(()=>({error:r.status}));
-      throw Error(errBody.error||r.status);
-    }
-    const d = await r.json();
-    if(corp==='senado') API_SE=d; else API_CA=d;
-    document.getElementById('update-time').textContent = d.mdhm ? 'Act: '+d.mdhm : '';
+    const [rCA, rSE] = await Promise.allSettled([
+      fetch('/api/registraduria_proxy.py?path=ACT/CA/00'),
+      fetch('/api/registraduria_proxy.py?path=ACT/SE/00')
+    ]);
+    let ok = false;
+    if(rCA.status==='fulfilled'&&rCA.value.ok){ API_CA=await rCA.value.json(); ok=true; }
+    if(rSE.status==='fulfilled'&&rSE.value.ok){ API_SE=await rSE.value.json(); ok=true; }
+    if(!ok) throw Error('Sin datos');
+    const d=API_CA||API_SE;
+    document.getElementById('update-time').textContent=d?.mdhm?'Act: '+d.mdhm:'';
     setStatus('EN VIVO','#22c55e');
   } catch(e) {
     setStatus('Offline','#f59e0b');
@@ -725,7 +725,18 @@ function renderCongreso(corp,orient){
   document.getElementById('rp-title').textContent=`2026 EN VIVO — ${lbl}`;
   document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${lbl}`;
   fillLiveNatChart(corp,orient);
-  document.getElementById('rp-cur-section').style.display='none';
+
+  // Curules estimadas 2026 (Cifra Repartidora / D'Hondt)
+  const liveData2026=corp==='senado'?API_SE:API_CA;
+  const totalSeats2026=corp==='senado'?100:188;
+  const umbral2026=corp==='senado'?0.03:0.02;
+  const seats2026=computeEstimatedCurules(liveData2026,totalSeats2026,umbral2026,orient);
+  const rpCurVisible=seats2026.length>0;
+  document.getElementById('rp-cur-section').style.display=rpCurVisible?'':'none';
+  if(rpCurVisible){
+    document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — ${lbl} (proyección D'Hondt)`;
+    fillCurChart(chartRCur,seats2026);
+  }
 
   // Dept charts
   document.getElementById('lp-dept-section').style.display='none';
@@ -789,7 +800,18 @@ function renderConsultaPH(corp,orient){
   document.getElementById('rp-title').textContent=`Congreso 2026 EN VIVO — ${phLabels[liveCorp]}`;
   document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${phLabels[liveCorp]}`;
   fillLiveNatChart(liveCorp,orient);
-  document.getElementById('rp-cur-section').style.display='none';
+
+  // Curules estimadas 2026 (Cifra Repartidora / D'Hondt)
+  const livePHData=liveCorp==='senado'?API_SE:API_CA;
+  const totalPHSeats=liveCorp==='senado'?100:188;
+  const umbralPH=liveCorp==='senado'?0.03:0.02;
+  const seatsPH=computeEstimatedCurules(livePHData,totalPHSeats,umbralPH,orient);
+  const rpCurPHVisible=seatsPH.length>0;
+  document.getElementById('rp-cur-section').style.display=rpCurPHVisible?'':'none';
+  if(rpCurPHVisible){
+    document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — ${phLabels[liveCorp]} (proyección D'Hondt)`;
+    fillCurChart(chartRCur,seatsPH);
+  }
 
   document.getElementById('lp-dept-section').style.display='none';
   document.getElementById('rp-dept-section').style.display='none';
@@ -1118,6 +1140,32 @@ function fillLiveNatChart(corp,orient){
 
 // (legacy - no longer renders the bar, kept for compatibility)
 function renderCurules(){}
+
+// Estimación de curules con Cifra Repartidora (D'Hondt)
+// Senado: totalSeats=100, umbral=0.03 | Cámara: totalSeats=188, umbral=0.02
+function computeEstimatedCurules(liveData, totalSeats, umbral, orient) {
+  if(!liveData) return [];
+  const cam = liveData.camaras?.[0];
+  if(!cam?.partotabla) return [];
+  const tot = parseInt(cam.totales?.act?.votcan||0);
+  if(!tot) return [];
+  const thresh = tot * umbral;
+  const eligible = cam.partotabla
+    .map(p=>{ const a=p.act; const party=getParty(a.codpar); return {codpar:a.codpar,vot:parseInt(a.vot||0),n:party.n,c:party.c,o:party.o}; })
+    .filter(p=>p.vot>=thresh&&(orient==='todas'||p.o===orient));
+  if(!eligible.length) return [];
+  const seats={};
+  eligible.forEach(p=>seats[p.codpar]=0);
+  for(let i=0;i<totalSeats;i++){
+    let best=-1,winner=null;
+    for(const p of eligible){ const q=p.vot/(seats[p.codpar]+1); if(q>best){best=q;winner=p.codpar;} }
+    if(winner) seats[winner]++;
+  }
+  return eligible
+    .filter(p=>seats[p.codpar]>0)
+    .sort((a,b)=>seats[b.codpar]-seats[a.codpar])
+    .map(p=>({label:p.n,value:seats[p.codpar],color:p.c}));
+}
 
 // ═══════════════════════════════════════════════════
 // UTILS
