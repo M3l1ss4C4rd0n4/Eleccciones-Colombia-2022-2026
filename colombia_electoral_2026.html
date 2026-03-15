@@ -234,6 +234,7 @@ body{
     <select class="fs" id="sel-corp">
       <option value="camara">C&#225;mara de Representantes</option>
       <option value="senado">Senado</option>
+      <option value="presidencia">Presidencia</option>
     </select>
   </div>
   <div class="fg" id="fg-ph-type" style="display:none">
@@ -551,6 +552,7 @@ document.querySelectorAll('#nav button').forEach(btn => {
     selectedDept = null;
     const isPH = currentTab === 'consulta_ph';
     const isPresidencial = currentTab === 'presidencial';
+    // En pestaña Congreso, ocultar sel-corp cuando se vaya a mostrar PH
     document.getElementById('fg-corp').style.display = isPH ? 'none' : '';
     document.getElementById('fg-ph-type').style.display = isPH ? '' : 'none';
     document.getElementById('sel-corp').disabled = isPresidencial;
@@ -700,9 +702,40 @@ function render(){
   if(!GEO||!HIST) return;
   const corp=document.getElementById('sel-corp').value;
   const orient=document.getElementById('sel-orient').value;
-  if(currentTab==='congreso') renderCongreso(corp,orient);
+  if(currentTab==='congreso'){
+    if(corp==='presidencia') renderPresidencia(orient);
+    else renderCongreso(corp,orient);
+  }
   else if(currentTab==='presidencial') renderPresidencial(orient);
   else renderConsultaPH(corp,orient);
+}
+
+// Muestra en panel derecho los votos de la Consulta PH 2025 Presidencia para un depto
+// (usado en página 1 con opción Presidencia)
+function showPresidenciaRightDept(dpto){
+  const ph=HIST.consultas['2025'].presidente;
+  const histKey=DPTO_TO_HIST[dpto]||dpto;
+  const dname=DPTO_TO_NAME[dpto]||dpto;
+  const arr=(ph.departamentos||{})[histKey]||[];
+  document.getElementById('rp-dept-section').style.display='';
+  document.getElementById('rp-dept-title').textContent=`${dname} \u2014 Consulta PH 2025 Presidencia`;
+  document.getElementById('rp-dcur-wrap').style.display='none';
+  resetPhColors();
+  fillChart(chartRDept,arr.sort((a,b)=>b.votos-a.votos)
+    .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)})));
+}
+
+function showPresidencialV1Dept(dpto){
+  const v1=HIST.presidencial['2022'].vuelta1;
+  const histKey=DPTO_TO_HIST[dpto]||dpto;
+  const dname=DPTO_TO_NAME[dpto]||dpto;
+  const orient=document.getElementById('sel-orient').value;
+  const arr=v1.departamentos[histKey]||[];
+  const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
+  document.getElementById('rp-dept-section').style.display='';
+  document.getElementById('rp-dept-title').textContent=`${dname} — 1ª Vuelta 2022`;
+  document.getElementById('rp-dcur-wrap').style.display='none';
+  fillChart(chartRDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
 }
 
 function showPresidencialV2Dept(dpto){
@@ -766,6 +799,36 @@ function renderCongreso(corp,orient){
   selectedDept=null;
 }
 
+// Presidencia en página 1: izquierda=Presidencial 2022 V1, derecha=Consulta PH 2025 Presidencia
+function renderPresidencia(orient){
+  const v1=HIST.presidencial['2022'].vuelta1;
+  const ph=HIST.consultas['2025'].presidente;
+  document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
+  document.getElementById('right-title').textContent='Consulta PH 2025 — Presidencia';
+
+  layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
+  layerR=paintPHMap(mapR,layerR,ph,'right');
+
+  document.getElementById('lp-title').textContent='Presidencial 2022';
+  document.getElementById('lp-nat-title').textContent='Votos nacionales — 1ª Vuelta 2022';
+  const nat1=filterOrient(v1.nacional,orient,'orientacion')
+    .sort((a,b)=>b.votos-a.votos)
+    .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+  fillChart(chartLNat,nat1);
+  document.getElementById('lp-cur-section').style.display='none';
+
+  document.getElementById('rp-title').textContent='Consulta PH 2025 — Presidencia';
+  document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
+  resetPhColors();
+  const cands=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos)
+    .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
+  fillChart(chartRNat,cands);
+  document.getElementById('rp-cur-section').style.display='none';
+  document.getElementById('lp-dept-section').style.display='none';
+  document.getElementById('rp-dept-section').style.display='none';
+  selectedDept=null;
+}
+
 function renderPresidencial(orient){
   document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
   document.getElementById('right-title').textContent='Presidencial 2022 — 2ª Vuelta';
@@ -797,13 +860,44 @@ function renderPresidencial(orient){
 }
 
 function renderConsultaPH(corp,orient){
-  const phType = document.getElementById('sel-ph-type').value; // 'senado','camara','presidente'
+  // Para el mapa derecho: si phType es presidente, mostrar Consulta PH 2025 Presidencia vs Presidencial 2022
+  // Si es senado/camara, mostrar mapa en vivo 2026
+  const phType = document.getElementById('sel-ph-type').value;
   const ph = HIST.consultas['2025'][phType];
   if(!ph) return;
   const phLabels = {senado:'Senado',camara:'Cámara',presidente:'Presidencia'};
   const phLbl = phLabels[phType]||phType;
-  // Para el mapa derecho live, usamos corp (senado/camara) o senado para presidente
-  const liveCorp = phType==='presidente' ? 'senado' : phType;
+
+  if(phType==='presidente'){
+    // Izquierda: Consulta PH 2025 Presidencia | Derecha: Presidencial 2022 V1
+    const v1=HIST.presidencial['2022'].vuelta1;
+    document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
+    document.getElementById('right-title').textContent='Presidencial 2022 — 1ª Vuelta';
+    layerL=paintPHMap(mapL,layerL,ph,'left');
+    layerR=paintHistMap(mapR,layerR,v1.departamentos,orient,'right',true);
+
+    document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
+    document.getElementById('lp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
+    resetPhColors();
+    const cPH=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos)
+      .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
+    fillChart(chartLNat,cPH);
+    document.getElementById('lp-cur-section').style.display='none';
+
+    document.getElementById('rp-title').textContent='Presidencial 2022 — 1ª Vuelta';
+    document.getElementById('rp-nat-title').textContent='Votos nacionales — 1ª Vuelta 2022';
+    const nat1=filterOrient(v1.nacional,orient,'orientacion')
+      .sort((a,b)=>b.votos-a.votos)
+      .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+    fillChart(chartRNat,nat1);
+    document.getElementById('rp-cur-section').style.display='none';
+    document.getElementById('lp-dept-section').style.display='none';
+    document.getElementById('rp-dept-section').style.display='none';
+    selectedDept=null;
+    return;
+  }
+
+  const liveCorp = phType;
   document.getElementById('left-title').textContent=`PH Consulta 2025 — ${phLbl}`;
   document.getElementById('right-title').textContent=`Congreso 2026 EN VIVO — ${phLabels[liveCorp]||liveCorp}`;
 
@@ -957,9 +1051,17 @@ function deptEvents(fl,dpto,winners,side,maxPct){
     click(){
       selectedDept=dpto;
       refreshDeptChart();
-      if(currentTab==='congreso') fetchAndShowDeptLive(dpto);
+      const corp=document.getElementById('sel-corp').value;
+      const phType=document.getElementById('sel-ph-type').value;
+      if(currentTab==='congreso'){
+        if(corp==='presidencia') showPresidenciaRightDept(dpto);
+        else fetchAndShowDeptLive(dpto);
+      }
       else if(currentTab==='presidencial') showPresidencialV2Dept(dpto);
-      else if(currentTab==='consulta_ph') fetchAndShowDeptLive(dpto);
+      else if(currentTab==='consulta_ph'){
+        if(phType==='presidente') showPresidencialV1Dept(dpto);
+        else fetchAndShowDeptLive(dpto);
+      }
     }
   });
 }
@@ -997,6 +1099,15 @@ function refreshDeptChart(){
   document.getElementById('lp-dept-section').style.display='';
 
   if(currentTab==='congreso'){
+    if(corp==='presidencia'){
+      // Izquierda: Presidencial 2022 V1 dept data
+      const v1=HIST.presidencial['2022'].vuelta1;
+      const arr=v1.departamentos[histKey]||[];
+      const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
+      document.getElementById('lp-dept-title').textContent=`${dname} — Presidencial 2022 1ª Vuelta`;
+      fillChart(chartLDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
+      document.getElementById('lp-dcur-wrap').style.display='none';
+    } else {
     const hc=corp==='senado'?HIST.congreso['2022'].senado:HIST.congreso['2022'].camara;
     const arr=hc.departamentos[histKey]||[];
     const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
@@ -1017,6 +1128,7 @@ function refreshDeptChart(){
     } else {
       document.getElementById('lp-dcur-wrap').style.display='none';
     }
+    } // close else (corp !== 'presidencia')
   } else if(currentTab==='presidencial'){
     const v1=HIST.presidencial['2022'].vuelta1;
     const arr=v1.departamentos[histKey]||[];
