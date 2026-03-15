@@ -569,12 +569,13 @@ function paintCNMapByCand(map,oldLayer,side){
     const totalVots=d.all.reduce((s,c)=>s+c.vot,0);
     const w1=d.winner;
     // Tooltip muestra 1º y 2º; color y nombre del 2º
+    // Tooltip para el mapa CN: el 'extra' contiene los datos del 1er candidato
     winners[dpto]={
       name:`2° ${ru.name}`,
       color:cnCandColor(ru.cedula),
       pct:ru.pct,
       vot:ru.vot,
-      extra:`1° ${w1.name} ${w1.pct.toFixed(1)}%`
+      extra:{name:`1° ${w1.name}`,pct:w1.pct.toFixed(1),vot:w1.vot}
     };
   }
   const maxPct=Math.max(...Object.values(winners).map(w=>w.pct),1);
@@ -599,7 +600,12 @@ function makeTT(dpto, w) {
   if (!w) return `<div class="dn">${name}</div><div class="dp" style="opacity:.5">Sin datos disponibles</div>`;
   const col = w.color || '#4e6490';
   const votStr = (w.vot && w.vot > 0) ? `<div class="dv">${fmt(w.vot)} votos</div>` : '';
-  const extraStr = w.extra ? `<div class="dp" style="opacity:.65;font-size:12px;margin-top:2px">${w.extra}</div>` : '';
+  const extraStr = w.extra
+    ? `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.12)">`+
+      `<div style="color:#fbbf24;font-weight:700;font-size:13px">${w.extra.name}</div>`+
+      `<div style="color:#fbbf24;font-size:18px;font-weight:800">${w.extra.pct}%</div>`+
+      `<div style="color:#94a3b8;font-size:11px">${fmt(w.extra.vot)} votos &#x2014; 1<sup>er</sup> puesto</div>`+
+      `</div>` : '';
   return `<div class="dn">${name}</div>` +
     `<div class="dp"><div class="dpdc" style="background:${col}"></div>${w.name}</div>` +
     `<div class="dpct" style="color:${col}">${w.pct.toFixed(1)}<span style="font-size:15px;font-weight:600">%</span></div>` +
@@ -750,6 +756,38 @@ function fillChart(chart,items){
   chart.update('none');
 }
 function clearChart(chart){ fillChart(chart,[]); }
+
+// Convierte un chart existente en doughnut (para la vista CN presidencia)
+function switchToDoughnut(chart){
+  if(chart.config.type==='doughnut') return;
+  chart.config.type='doughnut';
+  chart.config.options.indexAxis=undefined;
+  chart.config.options.scales={};
+  chart.config.options.plugins.legend={display:true,position:'right',labels:{color:'#7f9bc7',font:{size:9,family:'Inter'},boxWidth:12,padding:8}};
+  chart.config.options.plugins.tooltip.callbacks={label:ctx=>`${ctx.label}: ${fmt(ctx.raw)} votos (${((ctx.raw/ctx.dataset.data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)` };
+  delete chart.config.data.datasets[0].borderRadius;
+  delete chart.config.data.datasets[0].borderSkipped;
+  chart.config.data.datasets[0].hoverOffset=10;
+  chart.config.data.datasets[0].borderWidth=2;
+  chart.config.data.datasets[0].borderColor='rgba(10,18,40,.8)';
+}
+// Convierte un chart doughnut de vuelta a barra horizontal
+function switchToBar(chart){
+  if(chart.config.type==='bar') return;
+  chart.config.type='bar';
+  chart.config.options.indexAxis='y';
+  chart.config.options.scales={
+    x:{ticks:{color:'#4e6490',font:{size:9,family:'Inter'},callback:v=>fmtK(v)},grid:{color:'rgba(255,255,255,.04)'},border:{display:false}},
+    y:{ticks:{color:'#7f9bc7',font:{size:9.5,family:'Inter'},maxRotation:0},grid:{display:false},border:{display:false}}
+  };
+  chart.config.options.plugins.legend={display:false};
+  chart.config.options.plugins.tooltip.callbacks={label:ctx=>' '+fmt(ctx.raw)+' votos'};
+  chart.config.data.datasets[0].borderRadius=5;
+  chart.config.data.datasets[0].borderSkipped=false;
+  delete chart.config.data.datasets[0].hoverOffset;
+  delete chart.config.data.datasets[0].borderWidth;
+  delete chart.config.data.datasets[0].borderColor;
+}
 
 // Chart de curules — barras VERTICALES con color por partido
 function mkCurChart(id){
@@ -944,6 +982,7 @@ function renderPresidencia(orient){
   document.getElementById('rp-title').textContent='Consulta Interpartidista 2026';
   document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta presidencial 2026';
   const cnCands=getCNNationalCandidates();
+  switchToDoughnut(chartRNat);
   fillChart(chartRNat,cnCands.slice(0,12));
   document.getElementById('rp-cur-section').style.display='none';
   document.getElementById('lp-dept-section').style.display='none';
@@ -973,6 +1012,7 @@ function renderPresidencial(orient){
   const nat2=filterOrient(v2.nacional,orient,'orientacion')
     .sort((a,b)=>b.votos-a.votos)
     .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+  switchToBar(chartRNat);
   fillChart(chartRNat,nat2);
   document.getElementById('rp-cur-section').style.display='none';
 
@@ -1007,6 +1047,7 @@ function renderConsultaPH(corp,orient){
     document.getElementById('rp-title').textContent='Consulta Interpartidista 2026';
     document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta presidencial 2026';
     const cnCands=getCNNationalCandidates();
+    switchToDoughnut(chartRNat);
     fillChart(chartRNat,cnCands.slice(0,12));
     document.getElementById('rp-cur-section').style.display='none';
     document.getElementById('lp-dept-section').style.display='none';
@@ -1414,6 +1455,7 @@ function fillLiveNatChart(corp,orient){
     .map(p=>{const a=p.act;const party=getParty(a.codpar);return{label:party.n,value:parseInt(a.vot||0),color:party.c,ori:party.o};})
     .filter(i=>i.value>0&&(orient==='todas'||i.ori===orient))
     .sort((a,b)=>b.value-a.value);
+  switchToBar(chartRNat);
   fillChart(chartRNat,items);
 }
 
