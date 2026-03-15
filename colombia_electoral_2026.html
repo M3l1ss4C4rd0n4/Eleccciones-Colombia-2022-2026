@@ -292,6 +292,10 @@ body{
         <div class="sec-hdr" id="lp-cur-title">Curules Nacionales 2022</div>
         <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-L-cur"></canvas></div></div>
       </div>
+      <div id="lp-nat-top10-wrap" style="display:none">
+        <div class="sec-hdr" id="lp-nat-top10-title">Top 10 candidatos — Nacional 2022</div>
+        <div id="lp-nat-top10-list" class="top10-list"></div>
+      </div>
       <div id="lp-dept-section" style="display:none">
         <div class="sec-hdr" id="lp-dept-title">Seleccione un departamento</div>
         <div class="chart-box"><div class="cwrap"><canvas id="chart-L-dept"></canvas></div></div>
@@ -342,6 +346,10 @@ body{
       <div id="rp-cur-section" style="display:none">
         <div class="sec-hdr" id="rp-cur-title">Curules 2026</div>
         <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-R-cur"></canvas></div></div>
+      </div>
+      <div id="rp-nat-top10-wrap" style="display:none">
+        <div class="sec-hdr" id="rp-nat-top10-title">Top 10 candidatos — Nacional 2026</div>
+        <div id="rp-nat-top10-list" class="top10-list"></div>
       </div>
       <div id="rp-dept-section" style="display:none">
         <div class="sec-hdr" id="rp-dept-title">Seleccione un departamento</div>
@@ -1032,17 +1040,25 @@ function renderCongreso(corp,orient){
   document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${lbl}`;
   fillLiveNatChart(corp,orient);
 
-  // Curules estimadas 2026 (Cifra Repartidora / D'Hondt)
-  const liveData2026=corp==='senado'?API_SE:API_CA;
-  const totalSeats2026=corp==='senado'?100:188;
-  const umbral2026=corp==='senado'?0.03:0.02;
-  const seats2026=computeEstimatedCurules(liveData2026,totalSeats2026,umbral2026,orient);
-  const rpCurVisible=seats2026.length>0;
-  document.getElementById('rp-cur-section').style.display=rpCurVisible?'':'none';
-  if(rpCurVisible){
-    document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — ${lbl} (proyección D'Hondt)`;
-    fillCurChart(chartRCur,seats2026);
+  // Curules estimadas 2026 — solo Senado (D'Hondt nacional es válido);
+  // para Cámara se omite: la Cámara se elige por departamento, no con D'Hondt nacional
+  if(corp==='senado'){
+    const seats2026=computeEstimatedCurules(API_SE,100,0.03,orient);
+    const rpCurVisible=seats2026.length>0;
+    document.getElementById('rp-cur-section').style.display=rpCurVisible?'':'none';
+    if(rpCurVisible){
+      document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — Senado (proyección D'Hondt)`;
+      fillCurChart(chartRCur,seats2026);
+    }
+  } else {
+    document.getElementById('rp-cur-section').style.display='none';
   }
+
+  // Top 10 candidatos más votados nacionales
+  const top10Hist=getTop10NationalCandidates2022(corp);
+  fillTop10List('lp-nat-top10-wrap',`Top 10 candidatos nacionales — ${lbl} 2022`,top10Hist);
+  const top10Live=getLiveNationalCandidates(corp);
+  fillTop10List('rp-nat-top10-wrap',`Top 10 candidatos nacionales — ${lbl} 2026`,top10Live);
 
   // Dept charts
   document.getElementById('lp-dept-section').style.display='none';
@@ -1089,6 +1105,8 @@ function renderPresidencia(orient){
   switchToDoughnut(chartRNat);
   fillChartNumbered(chartRNat,cnCands.slice(0,12),document.getElementById('rp-nat-legend'));
   document.getElementById('rp-cur-section').style.display='none';
+  document.getElementById('lp-nat-top10-wrap').style.display='none';
+  document.getElementById('rp-nat-top10-wrap').style.display='none';
   document.getElementById('lp-dept-section').style.display='none';
   document.getElementById('rp-dept-section').style.display='none';
   selectedDept=null;
@@ -1120,7 +1138,8 @@ function renderPresidencial(orient){
   switchToBar(chartRNat);
   fillChart(chartRNat,nat2);
   document.getElementById('rp-cur-section').style.display='none';
-
+  document.getElementById('lp-nat-top10-wrap').style.display='none';
+  document.getElementById('rp-nat-top10-wrap').style.display='none';
   document.getElementById('lp-dept-section').style.display='none';
   document.getElementById('rp-dept-section').style.display='none';
   selectedDept=null;
@@ -1159,6 +1178,8 @@ function renderConsultaPH(corp,orient){
     switchToDoughnut(chartRNat);
     fillChartNumbered(chartRNat,cnCands.slice(0,12),document.getElementById('rp-nat-legend'));
     document.getElementById('rp-cur-section').style.display='none';
+    document.getElementById('lp-nat-top10-wrap').style.display='none';
+    document.getElementById('rp-nat-top10-wrap').style.display='none';
     document.getElementById('lp-dept-section').style.display='none';
     document.getElementById('rp-dept-section').style.display='none';
     selectedDept=null;
@@ -1187,17 +1208,24 @@ function renderConsultaPH(corp,orient){
   document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${phLabels[liveCorp]}`;
   fillLiveNatChart(liveCorp,orient);
 
-  // Curules estimadas 2026 (Cifra Repartidora / D'Hondt)
-  const livePHData=liveCorp==='senado'?API_SE:API_CA;
-  const totalPHSeats=liveCorp==='senado'?100:188;
-  const umbralPH=liveCorp==='senado'?0.03:0.02;
-  const seatsPH=computeEstimatedCurules(livePHData,totalPHSeats,umbralPH,orient);
-  const rpCurPHVisible=seatsPH.length>0;
-  document.getElementById('rp-cur-section').style.display=rpCurPHVisible?'':'none';
-  if(rpCurPHVisible){
-    document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — ${phLabels[liveCorp]} (proyección D'Hondt)`;
-    fillCurChart(chartRCur,seatsPH);
+  // Curules estimadas 2026 — solo Senado (D'Hondt nacional es válido);
+  // para Cámara se omite: la Cámara se elige por departamento, no con D'Hondt nacional
+  if(liveCorp==='senado'){
+    const seatsPH=computeEstimatedCurules(API_SE,100,0.03,orient);
+    const rpCurPHVisible=seatsPH.length>0;
+    document.getElementById('rp-cur-section').style.display=rpCurPHVisible?'':'none';
+    if(rpCurPHVisible){
+      document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — Senado (proyección D'Hondt)`;
+      fillCurChart(chartRCur,seatsPH);
+    }
+  } else {
+    document.getElementById('rp-cur-section').style.display='none';
   }
+
+  // Top 10 candidatos nacionales 2026 (panel derecho); izquierdo muestra candidatos PH consulta
+  document.getElementById('lp-nat-top10-wrap').style.display='none';
+  const top10LivePH=getLiveNationalCandidates(liveCorp);
+  fillTop10List('rp-nat-top10-wrap',`Top 10 candidatos nacionales — ${phLabels[liveCorp]} 2026`,top10LivePH);
 
   document.getElementById('lp-dept-section').style.display='none';
   document.getElementById('rp-dept-section').style.display='none';
@@ -1383,6 +1411,8 @@ function refreshDeptChart(){
 
   // Mostrar sección dept en panel izquierdo
   document.getElementById('lp-dept-section').style.display='';
+  document.getElementById('lp-nat-top10-wrap').style.display='none';
+  document.getElementById('rp-nat-top10-wrap').style.display='none';
 
   if(currentTab==='congreso'){
     if(corp==='presidencia'){
@@ -1616,6 +1646,46 @@ function getCurulesCamaraDept(dpto){
   return arr
     .sort((a,b)=>b.curules-a.curules)
     .map(p=>({label:p.partido, value:p.curules, color:bestColor(p.partido,p.color)||'#64748b'}));
+}
+
+// Top 10 candidatos más votados a nivel nacional 2022 (agrega candidatos_dep de todos los deptos)
+function getTop10NationalCandidates2022(corp){
+  if(!HIST) return [];
+  const hc = corp==='senado' ? HIST.congreso?.['2022']?.senado : HIST.congreso?.['2022']?.camara;
+  const candDep = hc?.candidatos_dep || {};
+  const agg = {}; // candidato -> {votos, partido, color}
+  for(const arr of Object.values(candDep)){
+    for(const c of arr){
+      const key = c.candidato;
+      if(!agg[key]) agg[key]={votos:0,partido:c.partido,color:c.color};
+      agg[key].votos += c.votos;
+    }
+  }
+  return Object.entries(agg)
+    .map(([name,d])=>({label:name,value:d.votos,color:bestColor(d.partido,d.color)||'#64748b'}))
+    .sort((a,b)=>b.value-a.value)
+    .slice(0,10);
+}
+
+// Top 10 candidatos más votados a nivel nacional desde API live (cantotabla dentro de partotabla)
+function getLiveNationalCandidates(corp){
+  const liveData = corp==='senado' ? API_SE : API_CA;
+  if(!liveData) return [];
+  const cam = liveData.camaras?.[0];
+  if(!cam?.partotabla) return [];
+  const all = [];
+  for(const p of cam.partotabla){
+    const party = getParty(p.act.codpar);
+    for(const c of (p.act.cantotabla||[])){
+      const vot = parseInt(c.vot||0);
+      if(vot>0) all.push({
+        label:`${c.nomcan||''} ${c.apecan||''}`.trim(),
+        value:vot,
+        color:party.c
+      });
+    }
+  }
+  return all.sort((a,b)=>b.value-a.value).slice(0,10);
 }
 
 // Llena el chart nacional del panel derecho con datos live
