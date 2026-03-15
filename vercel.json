@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
       "src": "public/**",
       "use": "@vercel/static"
     },
@@ -14,6 +18,22 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/colombia_electoral_2026.html"
+    },
+    {
+      "src": "/index.html",
+      "dest": "/colombia_electoral_2026.html"
+    },
+    {
+      "src": "/colombia_electoral_2026.html",
+      "dest": "/colombia_electoral_2026.html"
+    },
+    {
+      "src": "/data/(.*)",
+      "dest": "/public/data/$1"
     },
     {
       "src": "/(.*)",
