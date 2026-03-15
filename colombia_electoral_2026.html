@@ -1037,6 +1037,7 @@ function renderPresidencia(orient){
   const v1=HIST.presidencial['2022'].vuelta1;
   document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
   document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
+  layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
   layerR=paintCNMapByCand(mapR,layerR,'right');
 
   document.getElementById('lp-title').textContent='Presidencial 2022';
