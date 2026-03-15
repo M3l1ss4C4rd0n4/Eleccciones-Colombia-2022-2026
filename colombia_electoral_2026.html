@@ -423,9 +423,26 @@ const PC = {
   '107':{n:'Paz Colombia',c:'#34d399',o:'Centroizquierda'},
   '113':{n:'Mov. Alternativo',c:'#94a3b8',o:'Centro'},
   '124':{n:'Centro Esperanza',c:'#4ade80',o:'Centroizquierda'},
+  '152':{n:'Mov. Santander',c:'#e879f9',o:'Centro'},
+  '153':{n:'Mov. Regional',c:'#fbbf24',o:'Centro'},
   '170':{n:'Coalición Sindical',c:'#f59e0b',o:'Centroizquierda'},
 };
-function getParty(codpar){ return PC[String(codpar)]||{n:'Partido '+codpar,c:'#64748b',o:'Centro'}; }
+// Para partidos sin nombre conocido, genera un color único y determinista
+// basado en el número de codpar — paleta de 24 colores vividos
+const _UNKNOWN_PALETTE=[
+  '#e11d48','#db2777','#9333ea','#7c3aed','#4f46e5','#2563eb',
+  '#0284c7','#0891b2','#0d9488','#059669','#16a34a','#65a30d',
+  '#ca8a04','#d97706','#ea580c','#dc2626','#b45309','#7f1d1d',
+  '#1e3a5f','#134e4a','#1e1b4b','#3b0764','#4a044e','#064e3b'
+];
+function _unknownColor(codpar){
+  const n=parseInt(codpar)||0;
+  return _UNKNOWN_PALETTE[(n*7+13)%_UNKNOWN_PALETTE.length];
+}
+function getParty(codpar){
+  const k=String(codpar);
+  return PC[k]||{n:'Partido '+k,c:_unknownColor(k),o:'Centro'};
+}
 
 const NAMED_COLORS = {
   'Pacto Historico':'#ef4444','Pacto Hist\u00f3rico':'#ef4444',
