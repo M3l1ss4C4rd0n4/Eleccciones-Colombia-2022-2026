@@ -1,0 +1,8 @@
+# ── Procesamiento local (procesar_excels.py) ────────────────────────────────
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# ── Serverless Function /api/registraduria_proxy.py ─────────────────────────
+# requests no es necesario: usamos urllib.request (stdlib) para evitar deps
+# Si prefieres requests, descomenta la siguiente línea:
+# requests>=2.31.0

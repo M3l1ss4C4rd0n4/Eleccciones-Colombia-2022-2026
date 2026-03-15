@@ -1,0 +1,11 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Raw Excel source files (processed into historico.json)
+*.xlsx
+*.xls
+
+# Root-level geojson duplicate (lives in public/data/)
+/00.geojson

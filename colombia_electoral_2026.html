@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Atlas Electoral Colombia 2022&#8211;2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#030812;
+  --surface:#0d1829;
+  --card:#17233d;
+  --card2:#1e2d4a;
+  --border:rgba(100,130,200,.1);
+  --border2:rgba(100,150,220,.18);
+  --t1:#eef2ff;
+  --t2:#7f9bc7;
+  --t3:#4e6490;
+  --blue:#4f8ef7;
+  --green:#22c55e;
+  --orange:#f59e0b;
+  --r:10px;
+  --r2:6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--t1);
+  font-family:'Inter',system-ui,sans-serif;
+  font-size:13px;
+  line-height:1.4;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* ───────── HEADER */
+#hdr{
+  flex-shrink:0;
+  background:linear-gradient(180deg,#0b1628 0%,#0d1829 100%);
+  border-bottom:1px solid var(--border);
+  padding:0 22px;
+  height:52px;
+  display:flex;align-items:center;gap:14px;
+  position:relative;z-index:100;
+}
+#hdr::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#FCD116 0 33.3%,#003087 33.3% 66.7%,#CE1126 66.7% 100%);
+}
+#hdr h1{font-size:17px;font-weight:900;letter-spacing:-.4px;white-space:nowrap;}
+#hdr h1 em{color:var(--blue);font-style:normal;}
+.hd-sep{width:1px;height:18px;background:var(--border2);flex-shrink:0;}
+.hd-sub{font-size:12px;color:var(--t2);white-space:nowrap;}
+#live-badge{
+  margin-left:auto;display:flex;align-items:center;gap:6px;
+  background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);
+  color:#4ade80;font-size:11px;font-weight:700;
+  padding:3px 12px;border-radius:20px;letter-spacing:.4px;white-space:nowrap;
+}
+.live-dot{
+  width:6px;height:6px;background:#22c55e;border-radius:50%;
+  animation:blink 2s ease infinite;
+}
+@keyframes blink{
+  0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.7);}
+  50%{box-shadow:0 0 0 5px rgba(34,197,94,0);}
+}
+#update-time{font-size:11px;color:var(--t3);white-space:nowrap;}
+
+/* ───────── NAV */
+#nav{
+  flex-shrink:0;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;padding:0 18px;gap:2px;
+}
+#nav button{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--t2);cursor:pointer;
+  font:500 12.5px/1 'Inter',sans-serif;
+  padding:11px 15px 9px;
+  transition:color .15s,border-color .15s;white-space:nowrap;
+}
+#nav button:hover{color:var(--t1);}
+#nav button.active{color:var(--blue);border-bottom-color:var(--blue);}
+
+/* ───────── FILTER BAR */
+#filterbar{
+  flex-shrink:0;background:rgba(13,24,41,.93);
+  border-bottom:1px solid var(--border);
+  padding:7px 18px;display:flex;align-items:center;gap:16px;
+  backdrop-filter:blur(12px);
+}
+.fg{display:flex;align-items:center;gap:7px;}
+.fl{font-size:11.5px;color:var(--t2);font-weight:500;}
+.fs{
+  background:var(--card);border:1px solid var(--border2);
+  color:var(--t1);padding:5px 26px 5px 10px;
+  border-radius:var(--r2);font:12px 'Inter',sans-serif;
+  cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237f9bc7' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+  transition:border-color .15s;
+}
+.fs:focus{outline:none;border-color:var(--blue);}
+.fs:disabled{opacity:.4;cursor:default;}
+#api-status{margin-left:auto;font-size:12px;font-weight:600;}
+
+/* ───────── MAIN — 4 columnas: panel | mapa | mapa | panel */
+#main{
+  flex:1;display:grid;
+  grid-template-columns:260px 1fr 1fr 260px;
+  grid-template-rows:1fr;
+  min-height:0;overflow:hidden;
+}
+
+/* SIDE PANELS */
+.side-panel{
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#panel-right{border-right:none;border-left:1px solid var(--border);}
+.sp-head{
+  flex-shrink:0;padding:10px 13px 8px;
+  border-bottom:1px solid var(--border);
+}
+.sp-head h3{font-size:12px;font-weight:700;color:var(--t1);}
+.sp-head p{font-size:10.5px;color:var(--t3);margin-top:2px;}
+.sp-scroll{
+  flex:1;overflow-y:auto;padding:10px 10px 12px;
+  display:flex;flex-direction:column;gap:9px;
+}
+.sp-scroll::-webkit-scrollbar{width:3px;}
+.sp-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.sec-hdr{
+  font-size:9.5px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;
+}
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:9px;}
+.cwrap{position:relative;height:130px;}
+.cwrap-sm{position:relative;height:105px;}
+
+/* MAPS AREA (span las 2 columnas centrales del grid de #main) */
+#maps-area{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:8px;padding:8px;
+  grid-column:2/4;
+  min-height:0;align-content:stretch;
+}
+
+.map-container{
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);overflow:hidden;
+  transition:border-color .2s,box-shadow .2s;
+}
+.map-container:hover{border-color:var(--border2);box-shadow:0 0 0 1px rgba(79,142,247,.08);}
+.map-header{
+  flex-shrink:0;padding:9px 13px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:9px;
+}
+.mpill{width:20px;height:3px;border-radius:2px;flex-shrink:0;}
+.mht{font-size:13px;font-weight:700;letter-spacing:-.1px;}
+.mhspin{
+  margin-left:auto;width:13px;height:13px;
+  border:2px solid var(--border2);border-top-color:var(--green);
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.map-wrapper{flex:1;position:relative;min-height:180px;}
+.map-wrapper .leaflet-container{position:absolute!important;inset:0;background:#030812!important;}
+
+/* MAP LEGEND */
+.map-legend{
+  background:rgba(7,12,26,.93);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:8px 11px;font-size:10.5px;
+  max-width:185px;backdrop-filter:blur(10px);
+  box-shadow:0 8px 32px rgba(0,0,0,.7);
+}
+.map-legend h4{
+  font-size:9.5px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;
+}
+.leg-item{display:flex;align-items:center;gap:6px;margin:2px 0;overflow:hidden;}
+.leg-color{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+.leg-label{color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* DEPT TOOLTIP */
+.dept-tooltip{
+  background:rgba(20,30,58,.97);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:10px 13px;
+  pointer-events:none;box-shadow:0 10px 40px rgba(0,0,0,.85);min-width:155px;
+}
+.dept-tooltip .dn{font-size:14px;font-weight:800;margin-bottom:5px;letter-spacing:-.2px;color:var(--t1);}
+.dept-tooltip .dp{color:var(--t2);font-size:12px;margin:2px 0;display:flex;align-items:center;gap:5px;}
+.dept-tooltip .dpdc{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.dept-tooltip .dpct{font-size:26px;font-weight:900;margin-top:5px;letter-spacing:-.5px;}
+.dept-tooltip .dv{font-size:10.5px;color:var(--t3);margin-top:1px;}
+
+@media(max-width:1100px){
+  #main{grid-template-columns:220px 1fr 1fr 220px;}
+}
+@media(max-width:900px){
+  #main{grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr auto;}
+  #panel-left{grid-column:1/2;grid-row:1;max-height:200px;}
+  #maps-area{grid-column:1/3;grid-row:2;grid-template-columns:1fr;}
+  #panel-right{grid-column:2/3;grid-row:1;max-height:200px;}
+}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <h1>Atlas Electoral <em>Colombia</em></h1>
+  <div class="hd-sep"></div>
+  <span class="hd-sub">Comparativa departamental 2022&#8211;2026</span>
+  <div id="live-badge"><div class="live-dot"></div>EN VIVO 2026</div>
+  <span id="update-time"></span>
+</header>
+
+<nav id="nav">
+  <button class="active" data-tab="congreso">Congreso 2022 vs 2026</button>
+  <button data-tab="presidencial">Presidenciales 2022</button>
+  <button data-tab="consulta_ph">PH Consulta 2025 vs 2026</button>
+</nav>
+
+<div id="filterbar">
+  <div class="fg" id="fg-corp">
+    <span class="fl">Corporaci&#243;n</span>
+    <select class="fs" id="sel-corp">
+      <option value="camara">C&#225;mara de Representantes</option>
+      <option value="senado">Senado</option>
+    </select>
+  </div>
+  <div class="fg" id="fg-ph-type" style="display:none">
+    <span class="fl">PH Consulta</span>
+    <select class="fs" id="sel-ph-type">
+      <option value="senado">Senado</option>
+      <option value="camara">C&#225;mara</option>
+      <option value="presidente">Presidencia</option>
+    </select>
+  </div>
+  <div class="fg">
+    <span class="fl">Orientaci&#243;n</span>
+    <select class="fs" id="sel-orient">
+      <option value="todas">Todas</option>
+      <option value="Izquierda">Izquierda</option>
+      <option value="Centroizquierda">Centroizquierda</option>
+      <option value="Centro">Centro</option>
+      <option value="Centroderecha">Centroderecha</option>
+      <option value="Derecha">Derecha</option>
+    </select>
+  </div>
+  <span id="api-status"></span>
+</div>
+
+<div id="main">
+
+  <!-- PANEL IZQUIERDO: datos del mapa histórico / izquierdo -->
+  <div class="side-panel" id="panel-left">
+    <div class="sp-head">
+      <h3 id="lp-title">Mapa Izquierdo</h3>
+      <p>Clic en departamento para detalle</p>
+    </div>
+    <div class="sp-scroll">
+      <div>
+        <div class="sec-hdr" id="lp-nat-title">Nacional</div>
+        <div class="chart-box"><div class="cwrap"><canvas id="chart-L-nat"></canvas></div></div>
+      </div>
+      <div id="lp-cur-section">
+        <div class="sec-hdr" id="lp-cur-title">Curules Nacionales 2022</div>
+        <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-L-cur"></canvas></div></div>
+      </div>
+      <div id="lp-dept-section" style="display:none">
+        <div class="sec-hdr" id="lp-dept-title">Seleccione un departamento</div>
+        <div class="chart-box"><div class="cwrap"><canvas id="chart-L-dept"></canvas></div></div>
+        <div id="lp-dcur-wrap" style="margin-top:8px;display:none">
+          <div class="sec-hdr" id="lp-dcur-title">Curules Cámara — Dpto</div>
+          <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-L-dcur"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAPAS -->
+  <div id="maps-area">
+    <div class="map-container">
+      <div class="map-header">
+        <div class="mpill" style="background:#4f8ef7"></div>
+        <span class="mht" id="left-title">Cargando...</span>
+      </div>
+      <div class="map-wrapper"><div id="map-left" style="width:100%;height:100%"></div></div>
+    </div>
+    <div class="map-container">
+      <div class="map-header">
+        <div class="mpill" style="background:#22c55e"></div>
+        <span class="mht" id="right-title">Cargando...</span>
+        <div class="mhspin" id="right-spinner" style="display:none"></div>
+      </div>
+      <div class="map-wrapper"><div id="map-right" style="width:100%;height:100%"></div></div>
+    </div>
+  </div>
+
+  <!-- PANEL DERECHO: datos del mapa en vivo / derecho -->
+  <div class="side-panel" id="panel-right">
+    <div class="sp-head">
+      <h3 id="rp-title">Mapa Derecho</h3>
+      <p>Clic en departamento para detalle</p>
+    </div>
+    <div class="sp-scroll">
+      <div>
+        <div class="sec-hdr" id="rp-nat-title">Nacional 2026</div>
+        <div class="chart-box"><div class="cwrap"><canvas id="chart-R-nat"></canvas></div></div>
+      </div>
+      <div id="rp-cur-section" style="display:none">
+        <div class="sec-hdr" id="rp-cur-title">Curules 2026</div>
+        <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-R-cur"></canvas></div></div>
+      </div>
+      <div id="rp-dept-section" style="display:none">
+        <div class="sec-hdr" id="rp-dept-title">Seleccione un departamento</div>
+        <div class="chart-box"><div class="cwrap"><canvas id="chart-R-dept"></canvas></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// LOOKUPS
+// ═══════════════════════════════════════════════════
+const DPTO_TO_NAME = {
+  '05':'Antioquia','08':'Atl\u00e1ntico','11':'Bogot\u00e1 D.C.',
+  '13':'Bol\u00edvar','15':'Boyac\u00e1','17':'Caldas','18':'Caquet\u00e1',
+  '19':'Cauca','20':'Cesar','23':'C\u00f3rdoba','25':'Cundinamarca',
+  '27':'Choc\u00f3','41':'Huila','44':'La Guajira','47':'Magdalena',
+  '50':'Meta','52':'Nari\u00f1o','54':'N. de Santander','63':'Quind\u00edo',
+  '66':'Risaralda','68':'Santander','70':'Sucre','73':'Tolima',
+  '76':'Valle del Cauca','81':'Arauca','85':'Casanare','86':'Putumayo',
+  '88':'San Andr\u00e9s','91':'Amazonas','94':'Guain\u00eda','95':'Guaviare',
+  '97':'Vaupes','99':'Vichada'
+};
+
+const AMB_TO_DPTO = {
+  '6000':'91','0100':'05','4000':'81','0300':'08','1600':'11','0500':'13',
+  '0700':'15','0900':'17','4400':'18','1100':'19','1200':'20','1700':'27',
+  '8800':null,'1300':'23','1500':'25','5000':'94','5400':'95','1900':'41',
+  '4800':'44','2100':'47','5200':'50','2300':'52','2500':'54','2600':'63',
+  '2400':'66','2700':'68','2800':'70','2900':'73','3100':'76','4600':'85',
+  '6400':'86','5600':'88','6800':'97','7200':'99'
+};
+const DPTO_TO_AMB = Object.fromEntries(
+  Object.entries(AMB_TO_DPTO).filter(([,v])=>v).map(([k,v])=>[v,k])
+);
+
+// historico.json usa codigos internos Registraduria; GeoJSON usa DANE
+const HIST_TO_DPTO = {
+  '01':'05','03':'08','05':'13','07':'15','09':'17','11':'19','12':'20',
+  '13':'23','15':'25','16':'11','17':'27','19':'41','21':'47','23':'52',
+  '24':'66','25':'54','26':'63','27':'68','28':'70','29':'73','31':'76',
+  '40':'81','44':'18','46':'85','48':'44','50':'94','52':'50','54':'95',
+  '56':'88','60':'91','64':'86','68':'97','72':'99','88':'88'
+};
+const DPTO_TO_HIST = Object.fromEntries(
+  Object.entries(HIST_TO_DPTO).map(([k,v])=>[v,k])
+);
+
+// Catalogo de partidos (codpar → {n,c,o})
+const PC = {
+  '2':{n:'Partido Liberal',c:'#f97316',o:'Centroizquierda'},
+  '3':{n:'P. Conservador',c:'#3b82f6',o:'Centroderecha'},
+  '4':{n:'Partido de la U',c:'#f59e0b',o:'Centro'},
+  '5':{n:'Partido de la U',c:'#f59e0b',o:'Centro'},
+  '6':{n:'MAIS',c:'#10b981',o:'Izquierda'},
+  '7':{n:'MIRA',c:'#a855f7',o:'Centro'},
+  '8':{n:'ASI',c:'#94a3b8',o:'Centro'},
+  '9':{n:'La Fuerza de la Paz',c:'#ec4899',o:'Izquierda'},
+  '10':{n:'Cambio Radical',c:'#06b6d4',o:'Centroderecha'},
+  '15':{n:'Mov. MIO',c:'#14b8a6',o:'Centro'},
+  '16':{n:'Fuerza y Corazon',c:'#fb923c',o:'Centroderecha'},
+  '17':{n:'Centro Democratico',c:'#38bdf8',o:'Derecha'},
+  '20':{n:'Opcion Ciudadana',c:'#7dd3fc',o:'Centro'},
+  '22':{n:'Somos Region',c:'#6ee7b7',o:'Centro'},
+  '33':{n:'Col. Progresista',c:'#f43f5e',o:'Izquierda'},
+  '38':{n:'Pacto Historico',c:'#ef4444',o:'Izquierda'},
+  '52':{n:'Alianza Verde',c:'#22c55e',o:'Centroizquierda'},
+  '53':{n:'Pacto Historico',c:'#ef4444',o:'Izquierda'},
+  '58':{n:'Col. Justa Libres',c:'#7c3aed',o:'Derecha'},
+  '59':{n:'Col. Justa Libres',c:'#7c3aed',o:'Derecha'},
+  '84':{n:'Nuevo Liberalismo',c:'#fb923c',o:'Centro'},
+  '85':{n:'Colombia Humana',c:'#dc2626',o:'Izquierda'},
+  '93':{n:'Pacto Historico',c:'#ef4444',o:'Izquierda'},
+  '98':{n:'AICO',c:'#10b981',o:'Izquierda'},
+  '107':{n:'Paz Colombia',c:'#34d399',o:'Centroizquierda'},
+  '124':{n:'Centro Esperanza',c:'#4ade80',o:'Centroizquierda'},
+};
+function getParty(codpar){ return PC[String(codpar)]||{n:'Partido '+codpar,c:'#64748b',o:'Centro'}; }
+
+const NAMED_COLORS = {
+  'Pacto Historico':'#ef4444','Pacto Hist\u00f3rico':'#ef4444',
+  'Partido Liberal':'#f97316','P. Conservador':'#3b82f6',
+  'Partido Conservador':'#3b82f6','Cambio Radical':'#06b6d4',
+  'Centro Democratico':'#38bdf8','Centro Democr\u00e1tico':'#38bdf8',
+  'Partido Centro Democr\u00e1tico':'#38bdf8',
+  'Partido de la U':'#f59e0b','P. de la U':'#f59e0b',
+  'Alianza Verde':'#22c55e','Partido Verde':'#22c55e',
+  'Col. Justa Libres':'#7c3aed','Colombia Justa Libres':'#7c3aed',
+  'MIRA \u2013 Colombia Justa Libres':'#7c3aed','MIRA-Col. Justa Libres':'#7c3aed',
+  'Colombia Humana':'#dc2626','Nuevo Liberalismo':'#fb923c',
+  'Centro Esperanza':'#4ade80','Coalici\u00f3n Centro Esperanza':'#4ade80',
+  'Equipo por Colombia':'#3b82f6','Liga Gobernantes':'#eab308',
+  'Liga de Gobernantes Anticorrupci\u00f3n':'#eab308',
+  'Gustavo Petro':'#ef4444','Rodolfo Hern\u00e1ndez':'#eab308',
+  'Federico Guti\u00e9rrez':'#3b82f6','Sergio Fajardo':'#4ade80',
+  'MAIS':'#10b981','MIRA':'#a855f7','Fuerza Ciudadana':'#f43f5e',
+  'Colombia Renaciente':'#f43f5e','Fuerza y Coraz\u00f3n':'#fb923c',
+  'Gente en Movimiento':'#94a3b8','Alternativos':'#84cc16',
+  'Juntos por Colombia':'#e879f9',
+};
+function namedColor(name){ return NAMED_COLORS[name]||null; }
+function bestColor(name,jsonColor){ return namedColor(name)||jsonColor||'#64748b'; }
+
+// Paleta vibrante para candidatos del PH Consulta (colores únicos por index)
+const PH_PALETTE = [
+  '#ef4444','#f97316','#eab308','#22c55e','#06b6d4',
+  '#8b5cf6','#ec4899','#14b8a6','#f43f5e','#a78bfa','#fb923c','#4ade80'
+];
+// Asignar colores únicos a candidatos PH — se construye dinámicamente
+const _phColorCache = {};
+let _phColorIdx = 0;
+function phCandidateColor(name) {
+  if (!_phColorCache[name]) {
+    _phColorCache[name] = PH_PALETTE[_phColorIdx % PH_PALETTE.length];
+    _phColorIdx++;
+  }
+  return _phColorCache[name];
+}
+function resetPhColors() { Object.keys(_phColorCache).forEach(k=>delete _phColorCache[k]); _phColorIdx=0; }
+
+// Opacidad dinámica: escala la opacidad según participación relativa del ganador
+// pct = porcentaje del ganador sobre el total del depto (0-100)
+// maxPct = máximo pct encontrado en todos los deptos (para escalar relativamente)
+function dynOpacity(pct, maxPct) {
+  if (!maxPct || maxPct === 0) return 0.55;
+  // Escala de 0.30 (mínimo) a 0.92 (máximo)
+  return 0.30 + (pct / maxPct) * 0.62;
+}
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let GEO=null, HIST=null, API_CA=null, API_SE=null;
+let mapL=null, mapR=null, layerL=null, layerR=null;
+let chartNat=null, chartDept=null; // legacy (no longer used, kept for safety)
+let chartLNat=null, chartLCur=null, chartLDept=null, chartLDcur=null;
+let chartRNat=null, chartRCur=null, chartRDept=null;
+let currentTab='congreso', selectedDept=null;
+
+// ═══════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════
+function makeTT(dpto, w) {
+  const name = DPTO_TO_NAME[dpto] || ('Dpto ' + dpto);
+  if (!w) return `<div class="dn">${name}</div><div class="dp" style="opacity:.5">Sin datos disponibles</div>`;
+  const col = w.color || '#4e6490';
+  const votStr = (w.vot && w.vot > 0) ? `<div class="dv">${fmt(w.vot)} votos</div>` : '';
+  return `<div class="dn">${name}</div>` +
+    `<div class="dp"><div class="dpdc" style="background:${col}"></div>${w.name}</div>` +
+    `<div class="dpct" style="color:${col}">${w.pct.toFixed(1)}<span style="font-size:15px;font-weight:600">%</span></div>` +
+    votStr;
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  initMaps();
+  // Panel izquierdo
+  chartLNat  = mkChart('chart-L-nat');
+  chartLCur  = mkCurChart('chart-L-cur');
+  chartLDept = mkChart('chart-L-dept');
+  chartLDcur = mkCurChart('chart-L-dcur');
+  // Panel derecho
+  chartRNat  = mkChart('chart-R-nat');
+  chartRCur  = mkCurChart('chart-R-cur');
+  chartRDept = mkChart('chart-R-dept');
+  await Promise.all([loadGeo(), loadHistorico()]);
+  render();
+  fetchLiveData();
+  setInterval(() => fetchLiveData(), 60000);
+});
+
+document.querySelectorAll('#nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTab = btn.dataset.tab;
+    selectedDept = null;
+    const isPH = currentTab === 'consulta_ph';
+    const isPresidencial = currentTab === 'presidencial';
+    document.getElementById('fg-corp').style.display = isPH ? 'none' : '';
+    document.getElementById('fg-ph-type').style.display = isPH ? '' : 'none';
+    document.getElementById('sel-corp').disabled = isPresidencial;
+    render();
+  });
+});
+document.getElementById('sel-corp').addEventListener('change', () => fetchLiveData());
+document.getElementById('sel-ph-type').addEventListener('change', () => render());
+document.getElementById('sel-orient').addEventListener('change', () => render());
+
+// ═══════════════════════════════════════════════════
+// MAPS
+// ═══════════════════════════════════════════════════
+function initMaps() {
+  const tiles = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // Limitar la vista a Colombia y alrededores — evita el mapa mundial duplicado
+  const COL_BOUNDS = L.latLngBounds(L.latLng(-5, -84), L.latLng(14, -60));
+  const opts = {
+    zoom:5, center:[4.5,-74.5],
+    zoomControl:false, attributionControl:false,
+    minZoom:4, maxZoom:10,
+    maxBounds: COL_BOUNDS,
+    maxBoundsViscosity: 1.0
+  };
+  mapL = L.map('map-left', opts);
+  L.tileLayer(tiles, {bounds: COL_BOUNDS, noWrap: true}).addTo(mapL);
+  L.control.zoom({position:'topright'}).addTo(mapL);
+  mapR = L.map('map-right', {...opts});
+  L.tileLayer(tiles, {bounds: COL_BOUNDS, noWrap: true}).addTo(mapR);
+  L.control.zoom({position:'topright'}).addTo(mapR);
+}
+
+// ═══════════════════════════════════════════════════
+// DATA — rutas relativas a la raiz del proyecto
+// ═══════════════════════════════════════════════════
+async function loadGeo() {
+  try { const r=await fetch('public/data/00.geojson'); if(!r.ok)throw Error(r.status); GEO=await r.json(); }
+  catch(e){ console.error('GeoJSON:',e); }
+}
+async function loadHistorico() {
+  try { const r=await fetch('public/data/historico.json'); if(!r.ok)throw Error(r.status); HIST=await r.json(); }
+  catch(e){ console.error('historico.json:',e); }
+}
+
+async function fetchLiveData() {
+  const corp = document.getElementById('sel-corp').value;
+  const path = corp==='senado' ? 'ACT/SE/00' : 'ACT/CA/00';
+  setStatus('Actualizando\u2026','#4f8ef7');
+  show('right-spinner',true);
+  try {
+    const r = await fetch(`/api/registraduria_proxy?path=${path}`);
+    if(!r.ok) throw Error(r.status);
+    const d = await r.json();
+    if(corp==='senado') API_SE=d; else API_CA=d;
+    document.getElementById('update-time').textContent = d.mdhm ? 'Act: '+d.mdhm : '';
+    setStatus('EN VIVO','#22c55e');
+  } catch(e) {
+    setStatus('Offline','#f59e0b');
+    console.warn('Live:',e.message||e);
+  }
+  show('right-spinner',false);
+  if(GEO&&HIST) render();
+}
+
+function setStatus(msg,color){
+  const el=document.getElementById('api-status');
+  el.textContent=msg; el.style.color=color;
+}
+function show(id,visible){
+  const el=document.getElementById(id);
+  if(el) el.style.display=visible?'block':'none';
+}
+
+// ═══════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════
+function mkChart(id) {
+  return new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderRadius:5,borderSkipped:false}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(20,30,58,.97)',
+          borderColor:'rgba(100,150,220,.2)',borderWidth:1,
+          titleColor:'#eef2ff',bodyColor:'#7f9bc7',
+          padding:9,cornerRadius:6,
+          callbacks:{label:ctx=>' '+fmt(ctx.raw)+' votos'}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#4e6490',font:{size:9,family:'Inter'},callback:v=>fmtK(v)},grid:{color:'rgba(255,255,255,.04)'},border:{display:false}},
+        y:{ticks:{color:'#7f9bc7',font:{size:9.5,family:'Inter'},maxRotation:0},grid:{display:false},border:{display:false}}
+      }
+    }
+  });
+}
+function fillChart(chart,items){
+  const top=items.slice(0,12);
+  chart.data.labels=top.map(i=>truncate(i.label,24));
+  chart.data.datasets[0].data=top.map(i=>i.value);
+  chart.data.datasets[0].backgroundColor=top.map(i=>i.color);
+  chart.update('none');
+}
+function clearChart(chart){ fillChart(chart,[]); }
+
+// Chart de curules — barras VERTICALES con color por partido
+function mkCurChart(id){
+  return new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderRadius:4,borderSkipped:false}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(20,30,58,.97)',borderColor:'rgba(100,150,220,.2)',borderWidth:1,
+          titleColor:'#eef2ff',bodyColor:'#7f9bc7',padding:8,cornerRadius:5,
+          callbacks:{label:ctx=>` ${ctx.raw} curules`}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#7f9bc7',font:{size:8.5,family:'Inter'},maxRotation:35,maxTicksLimit:10},grid:{display:false},border:{display:false}},
+        y:{ticks:{color:'#4e6490',font:{size:9,family:'Inter'},stepSize:2},grid:{color:'rgba(255,255,255,.04)'},border:{display:false}}
+      }
+    }
+  });
+}
+function fillCurChart(chart,items){
+  const top=items.slice(0,12);
+  chart.data.labels=top.map(i=>truncate(i.label,18));
+  chart.data.datasets[0].data=top.map(i=>i.value);
+  chart.data.datasets[0].backgroundColor=top.map(i=>i.color);
+  chart.update('none');
+}
+function clearCurChart(chart){fillCurChart(chart,[]);}
+
+// ═══════════════════════════════════════════════════
+// RENDER DISPATCHER
+// ═══════════════════════════════════════════════════
+function render(){
+  if(!GEO||!HIST) return;
+  const corp=document.getElementById('sel-corp').value;
+  const orient=document.getElementById('sel-orient').value;
+  if(currentTab==='congreso') renderCongreso(corp,orient);
+  else if(currentTab==='presidencial') renderPresidencial(orient);
+  else renderConsultaPH(corp,orient);
+}
+
+function showPresidencialV2Dept(dpto){
+  const v2=HIST.presidencial['2022'].vuelta2;
+  const histKey=DPTO_TO_HIST[dpto]||dpto;
+  const dname=DPTO_TO_NAME[dpto]||dpto;
+  const orient=document.getElementById('sel-orient').value;
+  const arr=v2.departamentos[histKey]||[];
+  const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
+  document.getElementById('rp-dept-section').style.display='';
+  document.getElementById('rp-dept-title').textContent=`${dname} — 2ª Vuelta`;
+  fillChart(chartRDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
+}
+
+function renderCongreso(corp,orient){
+  const lbl=corp==='senado'?'Senado':'Cámara';
+  document.getElementById('left-title').textContent=`Congreso 2022 — ${lbl}`;
+  document.getElementById('right-title').textContent=`2026 EN VIVO — ${lbl}`;
+
+  const histCorp=corp==='senado'?HIST.congreso['2022'].senado:HIST.congreso['2022'].camara;
+  layerL=paintHistMap(mapL,layerL,histCorp.departamentos,orient,'left',false);
+  layerR=paintLiveMap(mapR,layerR,corp==='senado'?API_SE:API_CA,orient,'right');
+
+  // Panel izquierdo — votos nacionales 2022
+  document.getElementById('lp-title').textContent=`Congreso 2022 — ${lbl}`;
+  document.getElementById('lp-nat-title').textContent=`Votos nacionales 2022 — ${lbl}`;
+  const natItems=filterOrient(histCorp.nacional,orient,'orientacion')
+    .sort((a,b)=>b.votos-a.votos)
+    .map(p=>({label:p.partido,value:p.votos,color:bestColor(p.partido,p.color)}));
+  fillChart(chartLNat,natItems);
+
+  // Curules nacionales 2022 (senado disponible, cámara suma nacional)
+  const curulesNac2022=getCurules2022Nacional(corp);
+  const lp_cur_visible = curulesNac2022.length > 0;
+  document.getElementById('lp-cur-section').style.display=lp_cur_visible?'':'none';
+  if(lp_cur_visible){
+    document.getElementById('lp-cur-title').textContent=`Curules nacionales 2022 — ${lbl}`;
+    fillCurChart(chartLCur,curulesNac2022);
+  }
+
+  // Panel derecho — live
+  document.getElementById('rp-title').textContent=`2026 EN VIVO — ${lbl}`;
+  document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${lbl}`;
+  fillLiveNatChart(corp,orient);
+  document.getElementById('rp-cur-section').style.display='none';
+
+  // Dept charts
+  document.getElementById('lp-dept-section').style.display='none';
+  document.getElementById('rp-dept-section').style.display='none';
+  selectedDept=null;
+}
+
+function renderPresidencial(orient){
+  document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
+  document.getElementById('right-title').textContent='Presidencial 2022 — 2ª Vuelta';
+
+  const v1=HIST.presidencial['2022'].vuelta1;
+  const v2=HIST.presidencial['2022'].vuelta2;
+  layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
+  layerR=paintHistMap(mapR,layerR,v2.departamentos,orient,'right',true);
+
+  document.getElementById('lp-title').textContent='Presidencial 2022';
+  document.getElementById('lp-nat-title').textContent='Votos nacionales — 1ª Vuelta';
+  const nat1=filterOrient(v1.nacional,orient,'orientacion')
+    .sort((a,b)=>b.votos-a.votos)
+    .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+  fillChart(chartLNat,nat1);
+  document.getElementById('lp-cur-section').style.display='none';
+
+  document.getElementById('rp-title').textContent='Presidencial 2022 — 2ª Vuelta';
+  document.getElementById('rp-nat-title').textContent='Votos nacionales — 2ª Vuelta';
+  const nat2=filterOrient(v2.nacional,orient,'orientacion')
+    .sort((a,b)=>b.votos-a.votos)
+    .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+  fillChart(chartRNat,nat2);
+  document.getElementById('rp-cur-section').style.display='none';
+
+  document.getElementById('lp-dept-section').style.display='none';
+  document.getElementById('rp-dept-section').style.display='none';
+  selectedDept=null;
+}
+
+function renderConsultaPH(corp,orient){
+  const phType = document.getElementById('sel-ph-type').value; // 'senado','camara','presidente'
+  const ph = HIST.consultas['2025'][phType];
+  if(!ph) return;
+  const phLabels = {senado:'Senado',camara:'Cámara',presidente:'Presidencia'};
+  const phLbl = phLabels[phType]||phType;
+  // Para el mapa derecho live, usamos corp (senado/camara) o senado para presidente
+  const liveCorp = phType==='presidente' ? 'senado' : phType;
+  document.getElementById('left-title').textContent=`PH Consulta 2025 — ${phLbl}`;
+  document.getElementById('right-title').textContent=`Congreso 2026 EN VIVO — ${phLabels[liveCorp]||liveCorp}`;
+
+  layerL=paintPHMap(mapL,layerL,ph,'left');
+  layerR=paintLiveMap(mapR,layerR,liveCorp==='senado'?API_SE:API_CA,orient,'right');
+
+  document.getElementById('lp-title').textContent=`PH Consulta 2025 — ${phLbl}`;
+  document.getElementById('lp-nat-title').textContent=`Votos nacionales — Consulta 2025 (${phLbl})`;
+  resetPhColors();
+  const cands=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos).slice(0,12)
+    .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
+  fillChart(chartLNat,cands);
+  document.getElementById('lp-cur-section').style.display='none';
+
+  const liveKey = liveCorp==='senado'?'senado':'camara';
+  document.getElementById('rp-title').textContent=`Congreso 2026 EN VIVO — ${phLabels[liveCorp]}`;
+  document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${phLabels[liveCorp]}`;
+  fillLiveNatChart(liveCorp,orient);
+  document.getElementById('rp-cur-section').style.display='none';
+
+  document.getElementById('lp-dept-section').style.display='none';
+  document.getElementById('rp-dept-section').style.display='none';
+  selectedDept=null;
+}
+
+// ═══════════════════════════════════════════════════
+// MAP PAINT
+// ═══════════════════════════════════════════════════
+function paintHistMap(map,oldLayer,departamentos,orient,side,isCandidato){
+  if(oldLayer) map.removeLayer(oldLayer);
+  removeLegend(map,side);
+  if(!GEO) return null;
+  const winners={};
+  for(const [rawDept,arr] of Object.entries(departamentos)){
+    const dpto=HIST_TO_DPTO[pad2(rawDept)]||pad2(rawDept);
+    const filtered=orient==='todas'?arr:arr.filter(p=>(p.orientacion||'')===orient);
+    if(!filtered.length) continue;
+    const sorted=[...filtered].sort((a,b)=>b.votos-a.votos);
+    const total=sorted.reduce((s,p)=>s+p.votos,0);
+    const top=sorted[0];
+    const name=isCandidato?(top.candidato||top.partido):top.partido;
+    const pct=total>0?(top.votos/total)*100:0;
+    winners[dpto]={name,color:bestColor(name,top.color),pct,arr:sorted,vot:top.votos};
+  }
+  // Calcular máximo pct para opacidad relativa
+  const maxPct=Math.max(...Object.values(winners).map(w=>w.pct),1);
+  const layer=L.geoJSON(GEO,{
+    style:f=>deptStyle(pad2(f.properties.DPTO),winners,maxPct),
+    onEachFeature:(f,fl)=>deptEvents(fl,pad2(f.properties.DPTO),winners,side,maxPct)
+  });
+  layer.addTo(map);
+  addLegend(map,side,buildWinLegend(winners));
+  return layer;
+}
+
+function paintPHMap(map,oldLayer,ph,side){
+  if(oldLayer) map.removeLayer(oldLayer);
+  removeLegend(map,side);
+  if(!GEO) return null;
+  resetPhColors(); // reiniciar asignación de colores únicos por candidato
+  // Primera pasada: detectar todos los candidatos y pre-asignar colores
+  const allCands=new Set();
+  for(const arr of Object.values(ph.departamentos)){
+    if(arr) for(const c of arr) allCands.add(c.candidato||c.partido);
+  }
+  allCands.forEach(name=>phCandidateColor(name)); // pre-asigna orden consistente
+  const winners={};
+  for(const [rawDept,arr] of Object.entries(ph.departamentos)){
+    const dpto=HIST_TO_DPTO[pad2(rawDept)]||pad2(rawDept);
+    if(!arr||!arr.length) continue;
+    const sorted=[...arr].sort((a,b)=>b.votos-a.votos);
+    const total=sorted.reduce((s,p)=>s+p.votos,0);
+    const top=sorted[0];
+    const name=top.candidato||top.partido;
+    const pct=total>0?(top.votos/total)*100:0;
+    winners[dpto]={name,color:phCandidateColor(name),pct,arr:sorted,vot:top.votos};
+  }
+  const maxPct=Math.max(...Object.values(winners).map(w=>w.pct),1);
+  const layer=L.geoJSON(GEO,{
+    style:f=>deptStyle(pad2(f.properties.DPTO),winners,maxPct),
+    onEachFeature:(f,fl)=>deptEvents(fl,pad2(f.properties.DPTO),winners,side,maxPct)
+  });
+  layer.addTo(map);
+  addLegend(map,side,buildWinLegend(winners));
+  return layer;
+}
+
+function paintLiveMap(map,oldLayer,liveData,orient,side){
+  if(oldLayer) map.removeLayer(oldLayer);
+  removeLegend(map,side);
+  if(!GEO||!liveData) return null;
+  const cam=liveData.camaras?.[0];
+  if(!cam) return null;
+  const winners={};
+  for(const m of (cam.mapagan||[])){
+    const dpto=AMB_TO_DPTO[m.amb];
+    if(!dpto) continue;
+    const party=getParty(m.codpar);
+    const pvot=parseFloat((m.pvot||'0').replace(',','.'));
+    winners[dpto]={name:party.n,color:party.c,ori:party.o,pct:pvot,codpar:m.codpar,vot:parseInt(m.vot||0)};
+  }
+  const winsF=orient==='todas'?winners:Object.fromEntries(Object.entries(winners).filter(([,w])=>w.ori===orient));
+  const maxPct=Math.max(...Object.values(winsF).map(w=>w.pct),1);
+  const layer=L.geoJSON(GEO,{
+    style:f=>{
+      const d=pad2(f.properties.DPTO);
+      const w=winsF[d];
+      if(!w) return winners[d]?{fillColor:'#1a2540',color:'rgba(255,255,255,.12)',weight:1,fillOpacity:.5}:{fillColor:'#0d1829',color:'rgba(255,255,255,.08)',weight:.8,fillOpacity:.6};
+      const op=dynOpacity(w.pct,maxPct);
+      return {fillColor:w.color,color:'rgba(255,255,255,.15)',weight:1,fillOpacity:op};
+    },
+    onEachFeature:(f,fl)=>deptEventsLive(fl,pad2(f.properties.DPTO),winners,side,maxPct)
+  });
+  layer.addTo(map);
+  const wc={};
+  for(const w of Object.values(winsF)){if(!wc[w.name]) wc[w.name]={color:w.color,count:0}; wc[w.name].count++;}
+  const legItems=Object.entries(wc).sort((a,b)=>b[1].count-a[1].count).slice(0,7)
+    .map(([name,d])=>({label:`${name} (${d.count})`,color:d.color}));
+  addLegend(map,side,legItems);
+  return layer;
+}
+
+// ═══════════════════════════════════════════════════
+// DEPT STYLE & EVENTS
+// ═══════════════════════════════════════════════════
+function deptStyle(dpto,winners,maxPct){
+  const w=winners[dpto];
+  if(!w) return {fillColor:'#17233d',color:'rgba(255,255,255,.1)',weight:.8,fillOpacity:.75};
+  const op=dynOpacity(w.pct, maxPct||w.pct);
+  return {fillColor:w.color,color:'rgba(255,255,255,.18)',weight:1,fillOpacity:op};
+}
+
+function deptEvents(fl,dpto,winners,side,maxPct){
+  fl.on({
+    mouseover(e){
+      fl.setStyle({weight:2.5,color:side==='left'?'#4f8ef7':'#22c55e'});
+      fl.bindTooltip(makeTT(dpto,winners[dpto]),{className:'dept-tooltip',sticky:true,direction:'top'}).openTooltip(e.latlng);
+    },
+    mouseout(){fl.setStyle(deptStyle(dpto,winners,maxPct));fl.closeTooltip();},
+    click(){selectedDept=dpto;refreshDeptChart();if(currentTab==='congreso')fetchAndShowDeptLive(dpto);else if(currentTab==='presidencial'&&side==='right')showPresidencialV2Dept(dpto);}
+  });
+}
+
+function deptEventsLive(fl,dpto,winners,side,maxPct){
+  fl.on({
+    mouseover(e){
+      fl.setStyle({weight:2.5,color:'#22c55e'});
+      fl.bindTooltip(makeTT(dpto,winners[dpto]),{className:'dept-tooltip',sticky:true,direction:'top'}).openTooltip(e.latlng);
+    },
+    mouseout(){
+      const w=winners[dpto];
+      fl.setStyle({fillColor:w?w.color:'#0d1829',color:'rgba(255,255,255,.15)',weight:1,fillOpacity:w?dynOpacity(w.pct,maxPct):.4});
+      fl.closeTooltip();
+    },
+    click(){selectedDept=dpto;refreshDeptChart();fetchAndShowDeptLive(dpto);}
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// DEPT CHART
+// ═══════════════════════════════════════════════════
+function refreshDeptChart(){
+  if(!selectedDept){
+    document.getElementById('lp-dept-section').style.display='none';
+    return;
+  }
+  const corp=document.getElementById('sel-corp').value;
+  const orient=document.getElementById('sel-orient').value;
+  const dpto=selectedDept;
+  const histKey=DPTO_TO_HIST[dpto]||dpto;
+  const dname=DPTO_TO_NAME[dpto]||dpto;
+
+  // Mostrar sección dept en panel izquierdo
+  document.getElementById('lp-dept-section').style.display='';
+
+  if(currentTab==='congreso'){
+    const hc=corp==='senado'?HIST.congreso['2022'].senado:HIST.congreso['2022'].camara;
+    const arr=hc.departamentos[histKey]||[];
+    const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
+    document.getElementById('lp-dept-title').textContent=`${dname} — ${corp==='senado'?'Senado':'Cámara'} 2022`;
+    fillChart(chartLDept,filtered.map(p=>({label:p.partido,value:p.votos,color:bestColor(p.partido,p.color)})));
+
+    // Curules Cámara por departamento (solo disponible para cámara)
+    if(corp==='camara'){
+      const dcur=getCurulesCamaraDept(dname);
+      const dcurEl=document.getElementById('lp-dcur-wrap');
+      if(dcur.length){
+        dcurEl.style.display='';
+        document.getElementById('lp-dcur-title').textContent=`Curules Cámara 2022 — ${dname}`;
+        fillCurChart(chartLDcur,dcur);
+      } else {
+        dcurEl.style.display='none';
+      }
+    } else {
+      document.getElementById('lp-dcur-wrap').style.display='none';
+    }
+  } else if(currentTab==='presidencial'){
+    const v1=HIST.presidencial['2022'].vuelta1;
+    const arr=v1.departamentos[histKey]||[];
+    const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
+    document.getElementById('lp-dept-title').textContent=`${dname} — 1ª Vuelta`;
+    fillChart(chartLDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
+    document.getElementById('lp-dcur-wrap').style.display='none';
+  } else {
+    const phType=document.getElementById('sel-ph-type').value;
+    const ph=HIST.consultas['2025'][phType]||{};
+    const arr=(ph.departamentos||{})[histKey]||[];
+    const phLbls={senado:'Senado',camara:'Cámara',presidente:'Presidencia'};
+    document.getElementById('lp-dept-title').textContent=`${dname} — PH Consulta 2025 (${phLbls[phType]||phType})`;
+    fillChart(chartLDept,arr.sort((a,b)=>b.votos-a.votos).map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)})));
+    document.getElementById('lp-dcur-wrap').style.display='none';
+  }
+}
+
+async function fetchAndShowDeptLive(dpto){
+  const corp=document.getElementById('sel-corp').value;
+  const amb=DPTO_TO_AMB[dpto];
+  const dname=DPTO_TO_NAME[dpto]||dpto;
+  document.getElementById('rp-dept-section').style.display='';
+  if(!amb){document.getElementById('rp-dept-title').textContent=`${dname} — sin datos`;clearChart(chartRDept);return;}
+  const endpoint=`${corp==='senado'?'ACT/SE':'ACT/CA'}/${amb}`;
+  document.getElementById('rp-dept-title').textContent=`${dname} — cargando…`;
+  try{
+    const r=await fetch(`/api/registraduria_proxy?path=${endpoint}`);
+    if(!r.ok) throw Error(r.status);
+    const data=await r.json();
+    const cam=data.camaras?.[0];
+    if(!cam?.partotabla) throw Error('no data');
+    const items=cam.partotabla
+      .map(p=>{const a=p.act;const party=getParty(a.codpar);return{label:party.n,value:parseInt(a.vot||0),color:party.c};})
+      .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
+    document.getElementById('rp-dept-title').textContent=`${dname} — 2026 en vivo`;
+    fillChart(chartRDept,items);
+  }catch(e){
+    document.getElementById('rp-dept-title').textContent=`${dname} — sin datos en vivo`;
+    clearChart(chartRDept);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// LEGEND
+// ═══════════════════════════════════════════════════
+const legendControls={left:null,right:null};
+function addLegend(map,side,items){
+  removeLegend(map,side);
+  const div=L.DomUtil.create('div','map-legend');
+  div.innerHTML='<h4>Ganador por dpto</h4>'+
+    items.slice(0,7).map(i=>`<div class="leg-item"><div class="leg-color" style="background:${i.color}"></div><div class="leg-label">${i.label}</div></div>`).join('');
+  const ctrl=L.control({position:'bottomleft'});
+  ctrl.onAdd=()=>div;
+  ctrl.addTo(map);
+  legendControls[side]=ctrl;
+}
+function removeLegend(map,side){
+  if(legendControls[side]){try{map.removeControl(legendControls[side]);}catch(e){}legendControls[side]=null;}
+}
+function buildWinLegend(winners){
+  const wc={};
+  for(const w of Object.values(winners)){if(!wc[w.name]) wc[w.name]={color:w.color,count:0};wc[w.name].count++;}
+  return Object.entries(wc).sort((a,b)=>b[1].count-a[1].count).slice(0,7)
+    .map(([name,d])=>({label:`${name} (${d.count})`,color:d.color}));
+}
+
+// ═══════════════════════════════════════════════════
+// CURULES HELPERS
+// ═══════════════════════════════════════════════════
+
+// Normaliza nombres de partido para buscar en curules
+const PARTY_ALIAS = {
+  'Pacto Historico':'Pacto Historico','Pacto Histórico':'Pacto Historico',
+  'Pacto Historico y Partido verde':'Pacto Historico',
+  'Partido Conservador':'Partido Conservador','Conservador':'Partido Conservador',
+  'P. Conservador':'Partido Conservador',
+  'Partido Liberal':'Partido Liberal','Liberal':'Partido Liberal',
+  'Centro Democrático':'Centro Democrático','Partido Centro Democrático':'Centro Democrático',
+  'Cambio Radical':'Cambio Radical',
+  'Coalición Cambio Radical-MIRA':'Cambio Radical',
+  'Coalición Cambio Radical-MIRA-Colombia Justa Libres':'Cambio Radical',
+  'Partido de la U':'Partido de la U','Partido U':'Partido de la U',
+  'Partido de la Unión por la gente':'Partido de la U',
+  'Partido Verde':'Partido Verde','Alianza Verde':'Partido Verde',
+  'MIRA – Colombia Justa Libres':'MIRA – Colombia Justa Libres',
+  'Col. Justa Libres':'MIRA – Colombia Justa Libres',
+  'Coalición MIRA-Colombia Justa Libres':'MIRA – Colombia Justa Libres',
+  'Coalición Partido Conservador-Partido Centro Democrático':'Partido Conservador',
+  'Coalición Partido Conservador-Partido de la U':'Partido Conservador',
+  'Coalición Partido Liberal-Colombia Justa Libres':'Partido Liberal',
+  'Coalición Centro Esperanza':'Coalición Centro Esperanza',
+};
+function normParty(name){ return PARTY_ALIAS[name]||name; }
+
+function getCurules2022Nacional(corp){
+  if(!HIST||!HIST.curules) return [];
+  if(corp==='senado'){
+    return (HIST.curules['2022'].senado_nacional||[]).map(p=>({label:p.partido,value:p.curules,color:bestColor(p.partido,null)||'#64748b'}));
+  }
+  // Cámara: sumar todos los departamentos
+  const sums={};
+  for(const arr of Object.values(HIST.curules['2022'].camara_departamentos||{})){
+    for(const p of arr){
+      const k=normParty(p.partido);
+      sums[k]=(sums[k]||0)+p.curules;
+    }
+  }
+  return Object.entries(sums).sort((a,b)=>b[1]-a[1])
+    .map(([partido,curules])=>({label:partido,value:curules,color:bestColor(partido,null)||'#64748b'}));
+}
+
+// Busca curules de Cámara para un departamento por nombre
+function getCurulesCamaraDept(deptName){
+  if(!HIST||!HIST.curules) return [];
+  const all=HIST.curules['2022'].camara_departamentos||{};
+  // Buscar coincidencia aproximada
+  let data=all[deptName];
+  if(!data){
+    const key=Object.keys(all).find(k=>k.toLowerCase()===deptName.toLowerCase());
+    data=key?all[key]:null;
+  }
+  if(!data) return [];
+  return data.map(p=>({label:normParty(p.partido),value:p.curules,color:bestColor(normParty(p.partido),null)||'#64748b'}));
+}
+
+// Llena el chart nacional del panel derecho con datos live
+function fillLiveNatChart(corp,orient){
+  const liveData=corp==='senado'?API_SE:API_CA;
+  if(!liveData){clearChart(chartRNat);return;}
+  const cam=liveData.camaras?.[0];
+  if(!cam?.partotabla){clearChart(chartRNat);return;}
+  const items=cam.partotabla
+    .map(p=>{const a=p.act;const party=getParty(a.codpar);return{label:party.n,value:parseInt(a.vot||0),color:party.c,ori:party.o};})
+    .filter(i=>i.value>0&&(orient==='todas'||i.ori===orient))
+    .sort((a,b)=>b.value-a.value);
+  fillChart(chartRNat,items);
+}
+
+// renderCurules: no-op — now handled inside renderCongreso and renderConsultaPH
+function renderCurules(){ /* intentionally empty */ }
+
+// ═══════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════
+function filterOrient(arr,orient,key){if(!arr)return[];return orient==='todas'?arr:arr.filter(p=>(p[key]||'')===orient);}
+function pad2(v){if(v==null)return'';return String(v).trim().padStart(2,'0');}
+function fmt(n){return(n||0).toLocaleString('es-CO');}
+function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'k';return n;}
+function truncate(s,n){s=String(s||'');return s.length>n?s.slice(0,n-1)+'\u2026':s;}
+</script>
+</body>
+</html>
