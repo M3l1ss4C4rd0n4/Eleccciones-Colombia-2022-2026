@@ -1108,8 +1108,8 @@ function renderConsultaPH(corp,orient){
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('lp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
     resetPhColors();
+    // El mapa izq PH siempre muestra todos → el chart tampoco filtra por orientación
     const cPH=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos)
-      .filter(c=>orient==='todas'||(c.orientacion||'')===orient)
       .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
     switchToVBar(chartLNat);
     fillChartNumbered(chartLNat,cPH.slice(0,12),document.getElementById('lp-nat-legend'));
