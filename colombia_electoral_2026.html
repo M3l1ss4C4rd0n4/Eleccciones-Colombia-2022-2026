@@ -505,13 +505,9 @@ function phCandidateColor(name) {
 }
 function resetPhColors() { Object.keys(_phColorCache).forEach(k=>delete _phColorCache[k]); _phColorIdx=0; }
 
-// Opacidad dinámica: escala la opacidad según participación relativa del ganador
-// pct = porcentaje del ganador sobre el total del depto (0-100)
-// maxPct = máximo pct encontrado en todos los deptos (para escalar relativamente)
+// Opacidad fija: todos los departamentos del mismo partido tienen el mismo color uniforme
 function dynOpacity(pct, maxPct) {
-  if (!maxPct || maxPct === 0) return 0.55;
-  // Escala de 0.30 (mínimo) a 0.92 (máximo)
-  return 0.30 + (pct / maxPct) * 0.62;
+  return 0.82;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1251,8 +1247,7 @@ function paintLiveMap(map,oldLayer,liveData,orient,side){
       const d=pad2(f.properties.DPTO);
       const w=winsF[d];
       if(!w) return winners[d]?{fillColor:'#1a2540',color:'rgba(255,255,255,.12)',weight:1,fillOpacity:.5}:{fillColor:'#0d1829',color:'rgba(255,255,255,.08)',weight:.8,fillOpacity:.6};
-      const op=dynOpacity(w.pct,maxPct);
-      return {fillColor:w.color,color:'rgba(255,255,255,.15)',weight:1,fillOpacity:op};
+      return {fillColor:w.color,color:'rgba(255,255,255,.15)',weight:1,fillOpacity:0.82};
     },
     onEachFeature:(f,fl)=>deptEventsLive(fl,pad2(f.properties.DPTO),winners,side,maxPct)
   });
@@ -1271,8 +1266,7 @@ function paintLiveMap(map,oldLayer,liveData,orient,side){
 function deptStyle(dpto,winners,maxPct){
   const w=winners[dpto];
   if(!w) return {fillColor:'#17233d',color:'rgba(255,255,255,.1)',weight:.8,fillOpacity:.75};
-  const op=dynOpacity(w.pct, maxPct||w.pct);
-  return {fillColor:w.color,color:'rgba(255,255,255,.18)',weight:1,fillOpacity:op};
+  return {fillColor:w.color,color:'rgba(255,255,255,.18)',weight:1,fillOpacity:0.82};
 }
 
 function deptEvents(fl,dpto,winners,side,maxPct){
@@ -1308,7 +1302,7 @@ function deptEventsLive(fl,dpto,winners,side,maxPct){
     },
     mouseout(){
       const w=winners[dpto];
-      fl.setStyle({fillColor:w?w.color:'#0d1829',color:'rgba(255,255,255,.15)',weight:1,fillOpacity:w?dynOpacity(w.pct,maxPct):.4});
+      fl.setStyle({fillColor:w?w.color:'#0d1829',color:'rgba(255,255,255,.15)',weight:1,fillOpacity:w?0.82:.4});
       fl.closeTooltip();
     },
     click(){selectedDept=dpto;refreshDeptChart();fetchAndShowDeptLive(dpto);}
