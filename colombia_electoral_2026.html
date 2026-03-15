@@ -323,6 +323,10 @@ body{
       <div id="rp-dept-section" style="display:none">
         <div class="sec-hdr" id="rp-dept-title">Seleccione un departamento</div>
         <div class="chart-box"><div class="cwrap"><canvas id="chart-R-dept"></canvas></div></div>
+        <div id="rp-dcur-wrap" style="display:none">
+          <div class="sec-hdr" id="rp-dcur-title">Curules estimadas dpto</div>
+          <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-R-dcur"></canvas></div></div>
+        </div>
       </div>
     </div>
   </div>
@@ -501,7 +505,7 @@ let GEO=null, HIST=null, API_CA=null, API_SE=null;
 let mapL=null, mapR=null, layerL=null, layerR=null;
 let chartNat=null, chartDept=null; // legacy (no longer used, kept for safety)
 let chartLNat=null, chartLCur=null, chartLDept=null, chartLDcur=null;
-let chartRNat=null, chartRCur=null, chartRDept=null;
+let chartRNat=null, chartRCur=null, chartRDept=null, chartRDcur=null;
 let currentTab='congreso', selectedDept=null;
 
 // ═══════════════════════════════════════════════════
@@ -532,6 +536,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   chartRNat  = mkChart('chart-R-nat');
   chartRCur  = mkCurChart('chart-R-cur');
   chartRDept = mkChart('chart-R-dept');
+  chartRDcur = mkCurChart('chart-R-dcur');
   await Promise.all([loadGeo(), loadHistorico()]);
   render();
   fetchLiveData();
@@ -949,7 +954,13 @@ function deptEvents(fl,dpto,winners,side,maxPct){
       fl.bindTooltip(makeTT(dpto,winners[dpto]),{className:'dept-tooltip',sticky:true,direction:'top'}).openTooltip(e.latlng);
     },
     mouseout(){fl.setStyle(deptStyle(dpto,winners,maxPct));fl.closeTooltip();},
-    click(){selectedDept=dpto;refreshDeptChart();if(currentTab==='congreso')fetchAndShowDeptLive(dpto);else if(currentTab==='presidencial'&&side==='right')showPresidencialV2Dept(dpto);}
+    click(){
+      selectedDept=dpto;
+      refreshDeptChart();
+      if(currentTab==='congreso') fetchAndShowDeptLive(dpto);
+      else if(currentTab==='presidencial') showPresidencialV2Dept(dpto);
+      else if(currentTab==='consulta_ph') fetchAndShowDeptLive(dpto);
+    }
   });
 }
 
@@ -1025,7 +1036,14 @@ function refreshDeptChart(){
 }
 
 async function fetchAndShowDeptLive(dpto){
-  const corp=document.getElementById('sel-corp').value;
+  // Determina corporación según pestaña activa
+  let corp;
+  if(currentTab==='consulta_ph'){
+    const phType=document.getElementById('sel-ph-type').value;
+    corp=phType==='presidente'?'senado':phType;
+  } else {
+    corp=document.getElementById('sel-corp').value;
+  }
   const amb=DPTO_TO_AMB[dpto];
   const dname=DPTO_TO_NAME[dpto]||dpto;
   document.getElementById('rp-dept-section').style.display='';
@@ -1043,6 +1061,19 @@ async function fetchAndShowDeptLive(dpto){
       .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
     document.getElementById('rp-dept-title').textContent=`${dname} — 2026 en vivo`;
     fillChart(chartRDept,items);
+    // Curules estimadas por depto (solo Cámara)
+    const rpDcurWrap=document.getElementById('rp-dcur-wrap');
+    if(corp!=='senado'){
+      const totalDptoSeats=parseInt(cam.cargtota||cam.carg||0);
+      if(totalDptoSeats>0){
+        const dcur=computeEstimatedCurules({camaras:[cam]},totalDptoSeats,0,'todas');
+        if(dcur.length){
+          rpDcurWrap.style.display='';
+          document.getElementById('rp-dcur-title').textContent=`Curules estimadas 2026 — ${dname} (${totalDptoSeats} escaños)`;
+          fillCurChart(chartRDcur,dcur);
+        } else { rpDcurWrap.style.display='none'; }
+      } else { rpDcurWrap.style.display='none'; }
+    } else { document.getElementById('rp-dcur-wrap').style.display='none'; }
   }catch(e){
     // Fallback: show from mapagan (national data already loaded)
     const liveData=corp==='senado'?API_SE:API_CA;
@@ -1056,6 +1087,7 @@ async function fetchAndShowDeptLive(dpto){
       document.getElementById('rp-dept-title').textContent=`${dname} — sin datos en vivo`;
       clearChart(chartRDept);
     }
+    document.getElementById('rp-dcur-wrap').style.display='none';
   }
 }
 
