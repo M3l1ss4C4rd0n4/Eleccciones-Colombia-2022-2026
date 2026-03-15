@@ -1045,6 +1045,7 @@ function renderPresidencia(orient){
   const nat1=filterOrient(v1.nacional,orient,'orientacion')
     .sort((a,b)=>b.votos-a.votos)
     .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+  switchToBar(chartLNat);
   fillChart(chartLNat,nat1);
   document.getElementById('lp-cur-section').style.display='none';
 
