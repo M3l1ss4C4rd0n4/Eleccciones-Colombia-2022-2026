@@ -1249,7 +1249,7 @@ function paintLiveMap(map,oldLayer,liveData,orient,side){
       if(!w) return winners[d]?{fillColor:'#1a2540',color:'rgba(255,255,255,.12)',weight:1,fillOpacity:.5}:{fillColor:'#0d1829',color:'rgba(255,255,255,.08)',weight:.8,fillOpacity:.6};
       return {fillColor:w.color,color:'rgba(255,255,255,.15)',weight:1,fillOpacity:0.82};
     },
-    onEachFeature:(f,fl)=>deptEventsLive(fl,pad2(f.properties.DPTO),winners,side,maxPct)
+    onEachFeature:(f,fl)=>deptEventsLive(fl,pad2(f.properties.DPTO),winners,winsF,side,maxPct)
   });
   layer.addTo(map);
   const wc={};
@@ -1294,18 +1294,31 @@ function deptEvents(fl,dpto,winners,side,maxPct){
   });
 }
 
-function deptEventsLive(fl,dpto,winners,side,maxPct){
+function deptEventsLive(fl,dpto,winners,winsF,side,maxPct){
   fl.on({
     mouseover(e){
+      const wf=winsF[dpto];
+      if(!wf) return; // departamento filtrado — no reacciona al hover
       fl.setStyle({weight:2.5,color:'#22c55e'});
-      fl.bindTooltip(makeTT(dpto,winners[dpto]),{className:'dept-tooltip',sticky:true,direction:'top'}).openTooltip(e.latlng);
+      fl.bindTooltip(makeTT(dpto,wf),{className:'dept-tooltip',sticky:true,direction:'top'}).openTooltip(e.latlng);
     },
     mouseout(){
-      const w=winners[dpto];
-      fl.setStyle({fillColor:w?w.color:'#0d1829',color:'rgba(255,255,255,.15)',weight:1,fillOpacity:w?0.82:.4});
       fl.closeTooltip();
+      const wf=winsF[dpto];
+      const wa=winners[dpto];
+      // restaurar el estilo correcto según si el dept está filtrado o no
+      if(wf){
+        fl.setStyle({fillColor:wf.color,color:'rgba(255,255,255,.15)',weight:1,fillOpacity:0.82});
+      } else if(wa){
+        fl.setStyle({fillColor:'#1a2540',color:'rgba(255,255,255,.12)',weight:1,fillOpacity:.5});
+      } else {
+        fl.setStyle({fillColor:'#0d1829',color:'rgba(255,255,255,.08)',weight:.8,fillOpacity:.6});
+      }
     },
-    click(){selectedDept=dpto;refreshDeptChart();fetchAndShowDeptLive(dpto);}
+    click(){
+      if(!winsF[dpto]) return; // no permitir click en depts filtrados
+      selectedDept=dpto;refreshDeptChart();fetchAndShowDeptLive(dpto);
+    }
   });
 }
 
