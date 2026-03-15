@@ -166,6 +166,23 @@ def agrupar_dep(df, col_dep, col_partido, col_votos, min_votos=100):
     return result
 
 
+def agrupar_candidatos_dep(df, col_dep, col_cand, col_partido, col_votos, top_n=20, min_votos=50):
+    """Agrupa por departamento y candidato individual (excluye votos de lista codcan=0).
+    Devuelve dict {dep: [top N candidatos]}.
+    """
+    df = df.copy()
+    df["cand_clean"] = df[col_cand].astype(str).str.strip().str.title()
+    result = {}
+    for dep in df[col_dep].dropna().unique():
+        sub = df[df[col_dep] == dep]
+        grp = sub.groupby(["cand_clean", col_partido])[col_votos].sum().reset_index()
+        grp.columns = ["candidato", "partido", "votos"]
+        grp["votos"] = grp["votos"].astype(int)
+        grp = grp[grp["votos"] >= min_votos].sort_values("votos", ascending=False).head(top_n)
+        result[dep] = [enrich(r) for r in grp.to_dict("records")]
+    return result
+
+
 def agrupar_nacional(df, col_partido, col_votos, min_votos=100):
     """Agrupa nacional por partido. Devuelve lista ordenada por votos."""
     grp = df.groupby(col_partido)[col_votos].sum().reset_index()
@@ -323,6 +340,9 @@ df_sen22 = df_22[df_22["códigocorporación"] == 1]
 sen22_nac = agrupar_nacional(df_sen22, "partido_clean", "totalvotos")
 sen22_dep = agrupar_dep(df_sen22, "dep", "partido_clean", "totalvotos")
 sen22_gan = calcular_ganadores_dep(sen22_dep)
+# candidatos_dep: excluir votos de lista (códigocandidato==0 son votos al partido, no a candidato)
+sen22_cand_dep = agrupar_candidatos_dep(df_sen22[df_sen22["códigocandidato"] != 0],
+                                        "dep", "nombrecandidato", "partido_clean", "totalvotos")
 print(f"  → Senado 2022: {len(df_sen22):,} filas | {len(sen22_gan)} dptos | {len(sen22_nac)} partidos")
 
 # CÁMARA 2022 (códigocorporación == 2)
@@ -330,6 +350,8 @@ df_cam22 = df_22[df_22["códigocorporación"] == 2]
 cam22_nac = agrupar_nacional(df_cam22, "partido_clean", "totalvotos")
 cam22_dep = agrupar_dep(df_cam22, "dep", "partido_clean", "totalvotos")
 cam22_gan = calcular_ganadores_dep(cam22_dep)
+cam22_cand_dep = agrupar_candidatos_dep(df_cam22[df_cam22["códigocandidato"] != 0],
+                                        "dep", "nombrecandidato", "partido_clean", "totalvotos")
 print(f"  → Cámara 2022: {len(df_cam22):,} filas | {len(cam22_gan)} dptos | {len(cam22_nac)} partidos")
 
 # ── 5/5 PRESIDENCIALES 2022 ──────────────────────────────────────────────────
@@ -392,14 +414,16 @@ historico = {
     "congreso": {
         "2022": {
             "camara": {
-                "nacional":      cam22_nac,
-                "departamentos": cam22_dep,
-                "ganadores":     cam22_gan,
+                "nacional":          cam22_nac,
+                "departamentos":     cam22_dep,
+                "ganadores":         cam22_gan,
+                "candidatos_dep":    cam22_cand_dep,
             },
             "senado": {
-                "nacional":      sen22_nac,
-                "departamentos": sen22_dep,
-                "ganadores":     sen22_gan,
+                "nacional":          sen22_nac,
+                "departamentos":     sen22_dep,
+                "ganadores":         sen22_gan,
+                "candidatos_dep":    sen22_cand_dep,
             },
         },
         # El Congreso 2026 general no está disponible en los Excel;

@@ -218,6 +218,14 @@ body{
 .cand-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .cand-legend-num{color:var(--t3);min-width:18px;font-size:9px;flex-shrink:0;}
 .cand-legend-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* ── Top-10 lista de candidatos/partidos por dpto ── */
+.top10-list{display:flex;flex-direction:column;gap:2px;padding:4px 0;}
+.top10-item{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:5px;padding:2px 5px;border-radius:3px;background:rgba(255,255,255,.025);}
+.top10-rank{font-size:.63rem;font-weight:700;color:var(--t3);text-align:right;}
+.top10-name-wrap{min-width:0;display:flex;align-items:center;gap:5px;}
+.top10-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.top10-name{font-size:.69rem;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.top10-votes{font-size:.64rem;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -292,6 +300,10 @@ body{
           <div class="sec-hdr" id="lp-dcur-title">Curules Cámara — Dpto</div>
           <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-L-dcur"></canvas></div></div>
         </div>
+        <div id="lp-top10-wrap" style="margin-top:8px;display:none">
+          <div class="sec-hdr" id="lp-top10-title">Top 10 candidatos</div>
+          <div id="lp-top10-list" class="top10-list"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -338,6 +350,10 @@ body{
         <div id="rp-dcur-wrap" style="display:none">
           <div class="sec-hdr" id="rp-dcur-title">Curules estimadas dpto</div>
           <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-R-dcur"></canvas></div></div>
+        </div>
+        <div id="rp-top10-wrap" style="display:none">
+          <div class="sec-hdr" id="rp-top10-title">Top 10 candidatos</div>
+          <div id="rp-top10-list" class="top10-list"></div>
         </div>
       </div>
     </div>
@@ -881,6 +897,28 @@ function fillCurChart(chart,items){
 }
 function clearCurChart(chart){fillCurChart(chart,[]);}
 
+// Llena la lista top-10 de candidatos/partidos en un panel
+function fillTop10List(wrapId,titleText,items){
+  const wrap=document.getElementById(wrapId);
+  if(!wrap) return;
+  if(!items||!items.length){ wrap.style.display='none'; return; }
+  const listId=wrapId.replace('-wrap','-list');
+  const titleId=wrapId.replace('-wrap','-title');
+  document.getElementById(titleId).textContent=titleText;
+  const top=items.slice(0,10);
+  document.getElementById(listId).innerHTML=top.map((it,i)=>
+    `<div class="top10-item">
+      <span class="top10-rank">${i+1}</span>
+      <div class="top10-name-wrap">
+        <div class="top10-dot" style="background:${it.color||'#64748b'}"></div>
+        <span class="top10-name">${it.label||''}</span>
+      </div>
+      <span class="top10-votes">${fmt(it.value)}</span>
+    </div>`
+  ).join('');
+  wrap.style.display='';
+}
+
 // ═══════════════════════════════════════════════════
 // RENDER DISPATCHER
 // ═══════════════════════════════════════════════════
@@ -1356,6 +1394,7 @@ function refreshDeptChart(){
       switchToBar(chartLDept);
       fillChart(chartLDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
       document.getElementById('lp-dcur-wrap').style.display='none';
+      document.getElementById('lp-top10-wrap').style.display='none';
     } else {
     const hc=corp==='senado'?HIST.congreso['2022'].senado:HIST.congreso['2022'].camara;
     const arr=hc.departamentos[histKey]||[];
@@ -1366,7 +1405,7 @@ function refreshDeptChart(){
 
     // Curules Cámara por departamento (solo disponible para cámara)
     if(corp==='camara'){
-      const dcur=getCurulesCamaraDept(dname);
+      const dcur=getCurulesCamaraDept(dpto);
       const dcurEl=document.getElementById('lp-dcur-wrap');
       if(dcur.length){
         dcurEl.style.display='';
@@ -1378,6 +1417,13 @@ function refreshDeptChart(){
     } else {
       document.getElementById('lp-dcur-wrap').style.display='none';
     }
+
+    // Top-10 candidatos 2022 (senado y cámara)
+    const candDep=filterOrient(hc.candidatos_dep?.[histKey]||[],orient,'orientacion')
+      .sort((a,b)=>b.votos-a.votos);
+    fillTop10List('lp-top10-wrap',
+      `Top 10 candidatos — ${corp==='senado'?'Senado':'Cámara'} 2022, ${dname}`,
+      candDep.map(c=>({label:c.candidato,value:c.votos,color:bestColor(c.partido,c.color)})));
     } // close else (corp !== 'presidencia')
   } else if(currentTab==='presidencial'){
     const v1=HIST.presidencial['2022'].vuelta1;
@@ -1387,6 +1433,7 @@ function refreshDeptChart(){
     switchToBar(chartLDept);
     fillChart(chartLDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
     document.getElementById('lp-dcur-wrap').style.display='none';
+    document.getElementById('lp-top10-wrap').style.display='none';
   } else {
     const phType=document.getElementById('sel-ph-type').value;
     const ph=HIST.consultas['2025'][phType]||{};
@@ -1397,6 +1444,7 @@ function refreshDeptChart(){
     switchToVBar(chartLDept);
     fillChartNumbered(chartLDept,phDeptItems,document.getElementById('lp-dept-legend'));
     document.getElementById('lp-dcur-wrap').style.display='none';
+    document.getElementById('lp-top10-wrap').style.display='none';
   }
 }
 
@@ -1450,6 +1498,21 @@ async function fetchAndShowDeptLive(dpto){
         } else { rpDcurWrap.style.display='none'; }
       } else { rpDcurWrap.style.display='none'; }
     } else { document.getElementById('rp-dcur-wrap').style.display='none'; }
+
+    // Top-10 candidatos 2026 desde cantotabla (si la API los incluye)
+    const cands2026=[];
+    for(const p of cam.partotabla){
+      const a=p.act;
+      const party=getParty(a.codpar);
+      for(const c of (a.cantotabla||[])){
+        const vot=parseInt(c.vot||0);
+        if(vot>0) cands2026.push({label:`${c.nomcan||''} ${c.apecan||''}`.trim(),value:vot,color:party.c});
+      }
+    }
+    cands2026.sort((a,b)=>b.value-a.value);
+    fillTop10List('rp-top10-wrap',
+      `Top 10 candidatos — 2026 — ${dname}`,
+      cands2026);
   }catch(e){
     // Fallback: show from mapagan (national data already loaded)
     const liveData=corp==='senado'?API_SE:API_CA;
@@ -1464,6 +1527,7 @@ async function fetchAndShowDeptLive(dpto){
       clearChart(chartRDept);
     }
     document.getElementById('rp-dcur-wrap').style.display='none';
+    document.getElementById('rp-top10-wrap').style.display='none';
   }
 }
 
@@ -1520,34 +1584,52 @@ const PARTY_ALIAS = {
 function normParty(name){ return PARTY_ALIAS[name]||name; }
 
 function getCurules2022Nacional(corp){
-  if(!HIST||!HIST.curules) return [];
-  if(corp==='senado'){
-    return (HIST.curules['2022'].senado_nacional||[]).map(p=>({label:p.partido,value:p.curules,color:bestColor(p.partido,null)||'#64748b'}));
+  // Calcula curules 2022 via D'Hondt a partir de votos nacionales en historico.json
+  if(!HIST) return [];
+  const hc = corp==='senado' ? HIST.congreso?.['2022']?.senado : HIST.congreso?.['2022']?.camara;
+  if(!hc?.nacional?.length) return [];
+  const totalSeats = corp==='senado' ? 100 : 188;
+  const umbralPct  = corp==='senado' ? 0.03 : 0.02;
+  const totalVotes = hc.nacional.reduce((s,p)=>s+p.votos,0);
+  if(!totalVotes) return [];
+  const eligible = hc.nacional.filter(p=>p.votos >= totalVotes*umbralPct);
+  const seats={};
+  eligible.forEach(p=>{ seats[p.partido]=0; });
+  for(let i=0;i<totalSeats;i++){
+    let best=-1,winner=null;
+    for(const p of eligible){ const q=p.votos/(seats[p.partido]+1); if(q>best){best=q;winner=p.partido;} }
+    if(winner) seats[winner]++;
   }
-  // Cámara: sumar todos los departamentos
-  const sums={};
-  for(const arr of Object.values(HIST.curules['2022'].camara_departamentos||{})){
-    for(const p of arr){
-      const k=normParty(p.partido);
-      sums[k]=(sums[k]||0)+p.curules;
-    }
-  }
-  return Object.entries(sums).sort((a,b)=>b[1]-a[1])
-    .map(([partido,curules])=>({label:partido,value:curules,color:bestColor(partido,null)||'#64748b'}));
+  return eligible
+    .filter(p=>seats[p.partido]>0)
+    .sort((a,b)=>seats[b.partido]-seats[a.partido])
+    .map(p=>({label:p.partido,value:seats[p.partido],color:bestColor(p.partido,p.color)||'#64748b'}));
 }
 
-// Busca curules de Cámara para un departamento por nombre
-function getCurulesCamaraDept(deptName){
-  if(!HIST||!HIST.curules) return [];
-  const all=HIST.curules['2022'].camara_departamentos||{};
-  // Buscar coincidencia aproximada
-  let data=all[deptName];
-  if(!data){
-    const key=Object.keys(all).find(k=>k.toLowerCase()===deptName.toLowerCase());
-    data=key?all[key]:null;
+// Calcula curules Cámara 2022 para un departamento via D'Hondt desde votos históricos
+function getCurulesCamaraDept(dpto){
+  // dpto es código DANE (ej: '05'); histKey es código Registraduría (ej: '01')
+  const histKey = DPTO_TO_HIST[dpto] || dpto;
+  if(!HIST) return [];
+  const arr = HIST.congreso?.['2022']?.camara?.departamentos?.[histKey] || [];
+  if(!arr.length) return [];
+  const totalSeats = CAMARA_SEATS_BY_DPTO[dpto] || 0;
+  if(!totalSeats) return [];
+  const totalVotes = arr.reduce((s,p)=>s+p.votos,0);
+  if(!totalVotes) return [];
+  // Sin umbral mínimo a nivel departamental (umbral=0)
+  const eligible = arr.filter(p=>p.votos>0);
+  const seats={};
+  eligible.forEach(p=>{ seats[p.partido]=0; });
+  for(let i=0;i<totalSeats;i++){
+    let best=-1,winner=null;
+    for(const p of eligible){ const q=p.votos/(seats[p.partido]+1); if(q>best){best=q;winner=p.partido;} }
+    if(winner) seats[winner]++;
   }
-  if(!data) return [];
-  return data.map(p=>({label:normParty(p.partido),value:p.curules,color:bestColor(normParty(p.partido),null)||'#64748b'}));
+  return eligible
+    .filter(p=>seats[p.partido]>0)
+    .sort((a,b)=>seats[b.partido]-seats[a.partido])
+    .map(p=>({label:p.partido,value:seats[p.partido],color:bestColor(p.partido,p.color)||'#64748b'}));
 }
 
 // Llena el chart nacional del panel derecho con datos live
