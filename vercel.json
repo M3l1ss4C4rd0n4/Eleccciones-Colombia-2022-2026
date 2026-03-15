@@ -17,10 +17,6 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
       "src": "/",
       "dest": "/colombia_electoral_2026.html"
     },

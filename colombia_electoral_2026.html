@@ -412,6 +412,11 @@ const PC = {
   '90':{n:'Mov. Ciudadano',c:'#34d399',o:'Centro'},
   '91':{n:'Col. Renaciente',c:'#f43f5e',o:'Centroizquierda'},
   '92':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
+  '99':{n:'Mov. Regional',c:'#818cf8',o:'Centro'},
+  '112':{n:'Mov. Cívico',c:'#6366f1',o:'Centro'},
+  '125':{n:'Mov. Cívico',c:'#a78bfa',o:'Centro'},
+  '127':{n:'Mov. Regional',c:'#7c3aed',o:'Centro'},
+  '142':{n:'Mov. Cívico',c:'#8b5cf6',o:'Centro'},
   '93':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
   '98':{n:'AICO',c:'#10b981',o:'Izquierda'},
   '100':{n:'Mov. Colombia',c:'#e2e8f0',o:'Centro'},
@@ -574,7 +579,7 @@ async function fetchLiveData() {
   setStatus('Actualizando\u2026','#4f8ef7');
   show('right-spinner',true);
   try {
-    const r = await fetch(`/api/registraduria_proxy?path=${path}`);
+    const r = await fetch(`/api/registraduria_proxy.py?path=${path}`);
     if(!r.ok) {
       const errBody = await r.json().catch(()=>({error:r.status}));
       throw Error(errBody.error||r.status);
@@ -989,7 +994,7 @@ async function fetchAndShowDeptLive(dpto){
   const endpoint=`${corp==='senado'?'ACT/SE':'ACT/CA'}/${amb}`;
   document.getElementById('rp-dept-title').textContent=`${dname} — cargando…`;
   try{
-    const r=await fetch(`/api/registraduria_proxy?path=${endpoint}`);
+    const r=await fetch(`/api/registraduria_proxy.py?path=${endpoint}`);
     if(!r.ok) throw Error(r.status);
     const data=await r.json();
     const cam=data.camaras?.[0];
