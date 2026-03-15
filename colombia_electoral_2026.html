@@ -279,6 +279,7 @@ body{
       <div>
         <div class="sec-hdr" id="lp-nat-title">Nacional</div>
         <div class="chart-box"><div class="cwrap"><canvas id="chart-L-nat"></canvas></div></div>
+        <div id="lp-nat-legend" class="cand-legend" style="display:none"></div>
       </div>
       <div id="lp-cur-section">
         <div class="sec-hdr" id="lp-cur-title">Curules Nacionales 2022</div>
@@ -287,6 +288,7 @@ body{
       <div id="lp-dept-section" style="display:none">
         <div class="sec-hdr" id="lp-dept-title">Seleccione un departamento</div>
         <div class="chart-box"><div class="cwrap"><canvas id="chart-L-dept"></canvas></div></div>
+        <div id="lp-dept-legend" class="cand-legend" style="display:none"></div>
         <div id="lp-dcur-wrap" style="margin-top:8px;display:none">
           <div class="sec-hdr" id="lp-dcur-title">Curules Cámara — Dpto</div>
           <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-L-dcur"></canvas></div></div>
@@ -812,6 +814,8 @@ function switchToBar(chart){
   const _cid=chart.canvas?.id;
   if(_cid==='chart-R-nat'){const l=document.getElementById('rp-nat-legend');if(l)l.style.display='none';}
   if(_cid==='chart-R-dept'){const l=document.getElementById('rp-dept-legend');if(l)l.style.display='none';}
+  if(_cid==='chart-L-nat'){const l=document.getElementById('lp-nat-legend');if(l)l.style.display='none';}
+  if(_cid==='chart-L-dept'){const l=document.getElementById('lp-dept-legend');if(l)l.style.display='none';}
   chart._labels=null;
   chart.config.type='bar';
   chart.config.options.indexAxis='y';
@@ -977,6 +981,7 @@ function renderCongreso(corp,orient){
   const natItems=filterOrient(histCorp.nacional,orient,'orientacion')
     .sort((a,b)=>b.votos-a.votos)
     .map(p=>({label:p.partido,value:p.votos,color:bestColor(p.partido,p.color)}));
+  switchToBar(chartLNat);
   fillChart(chartLNat,natItems);
 
   // Curules nacionales 2022 (senado disponible, cámara suma nacional)
@@ -1067,6 +1072,7 @@ function renderPresidencial(orient){
   const nat1=filterOrient(v1.nacional,orient,'orientacion')
     .sort((a,b)=>b.votos-a.votos)
     .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
+  switchToBar(chartLNat);
   fillChart(chartLNat,nat1);
   document.getElementById('lp-cur-section').style.display='none';
 
@@ -1097,6 +1103,7 @@ function renderConsultaPH(corp,orient){
     // Izquierda: Consulta PH 2025 Presidencia | Derecha: Consulta Interpartidista 2026 EN VIVO
     document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
+    layerL=paintPHMap(mapL,layerL,ph,'left'); // ← fix: paint left map with PH 2025 presidential data
     layerR=paintCNMapByCand(mapR,layerR,'right');
 
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
@@ -1104,7 +1111,8 @@ function renderConsultaPH(corp,orient){
     resetPhColors();
     const cPH=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos)
       .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
-    fillChart(chartLNat,cPH);
+    switchToVBar(chartLNat);
+    fillChartNumbered(chartLNat,cPH.slice(0,12),document.getElementById('lp-nat-legend'));
     document.getElementById('lp-cur-section').style.display='none';
 
     document.getElementById('rp-title').textContent='Consulta Interpartidista 2026';
@@ -1131,7 +1139,8 @@ function renderConsultaPH(corp,orient){
   resetPhColors();
   const cands=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos).slice(0,12)
     .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
-  fillChart(chartLNat,cands);
+  switchToVBar(chartLNat);
+  fillChartNumbered(chartLNat,cands,document.getElementById('lp-nat-legend'));
   document.getElementById('lp-cur-section').style.display='none';
 
   const liveKey = liveCorp==='senado'?'senado':'camara';
@@ -1327,6 +1336,7 @@ function refreshDeptChart(){
       const arr=v1.departamentos[histKey]||[];
       const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
       document.getElementById('lp-dept-title').textContent=`${dname} — Presidencial 2022 1ª Vuelta`;
+      switchToBar(chartLDept);
       fillChart(chartLDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
       document.getElementById('lp-dcur-wrap').style.display='none';
     } else {
@@ -1334,6 +1344,7 @@ function refreshDeptChart(){
     const arr=hc.departamentos[histKey]||[];
     const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
     document.getElementById('lp-dept-title').textContent=`${dname} — ${corp==='senado'?'Senado':'Cámara'} 2022`;
+    switchToBar(chartLDept);
     fillChart(chartLDept,filtered.map(p=>({label:p.partido,value:p.votos,color:bestColor(p.partido,p.color)})));
 
     // Curules Cámara por departamento (solo disponible para cámara)
@@ -1356,6 +1367,7 @@ function refreshDeptChart(){
     const arr=v1.departamentos[histKey]||[];
     const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
     document.getElementById('lp-dept-title').textContent=`${dname} — 1ª Vuelta`;
+    switchToBar(chartLDept);
     fillChart(chartLDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
     document.getElementById('lp-dcur-wrap').style.display='none';
   } else {
@@ -1364,7 +1376,9 @@ function refreshDeptChart(){
     const arr=(ph.departamentos||{})[histKey]||[];
     const phLbls={senado:'Senado',camara:'Cámara',presidente:'Presidencia'};
     document.getElementById('lp-dept-title').textContent=`${dname} — PH Consulta 2025 (${phLbls[phType]||phType})`;
-    fillChart(chartLDept,arr.sort((a,b)=>b.votos-a.votos).map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)})));
+    const phDeptItems=arr.sort((a,b)=>b.votos-a.votos).map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
+    switchToVBar(chartLDept);
+    fillChartNumbered(chartLDept,phDeptItems,document.getElementById('lp-dept-legend'));
     document.getElementById('lp-dcur-wrap').style.display='none';
   }
 }
