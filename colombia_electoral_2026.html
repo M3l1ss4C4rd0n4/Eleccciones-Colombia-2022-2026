@@ -1272,11 +1272,13 @@ function deptStyle(dpto,winners,maxPct){
 function deptEvents(fl,dpto,winners,side,maxPct){
   fl.on({
     mouseover(e){
+      if(!winners[dpto]) return; // depto filtrado/oscuro — no reacciona
       fl.setStyle({weight:2.5,color:side==='left'?'#4f8ef7':'#22c55e'});
       fl.bindTooltip(makeTT(dpto,winners[dpto]),{className:'dept-tooltip',sticky:true,direction:'top'}).openTooltip(e.latlng);
     },
     mouseout(){fl.setStyle(deptStyle(dpto,winners,maxPct));fl.closeTooltip();},
     click(){
+      if(!winners[dpto]) return; // depto filtrado/oscuro — no permite click
       selectedDept=dpto;
       refreshDeptChart();
       const corp=document.getElementById('sel-corp').value;
