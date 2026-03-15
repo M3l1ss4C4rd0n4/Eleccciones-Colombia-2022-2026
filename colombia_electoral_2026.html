@@ -387,18 +387,38 @@ const PC = {
   '17':{n:'Centro Democratico',c:'#38bdf8',o:'Derecha'},
   '20':{n:'Opcion Ciudadana',c:'#7dd3fc',o:'Centro'},
   '22':{n:'Somos Region',c:'#6ee7b7',o:'Centro'},
+  '26':{n:'Somos Region',c:'#6ee7b7',o:'Centro'},
   '33':{n:'Col. Progresista',c:'#f43f5e',o:'Izquierda'},
-  '38':{n:'Pacto Historico',c:'#ef4444',o:'Izquierda'},
+  '34':{n:'Mov. Alternativo',c:'#cbd5e1',o:'Centro'},
+  '38':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
+  '39':{n:'Mov. Ciudadano',c:'#7dd3fc',o:'Centroizquierda'},
+  '40':{n:'MAIS',c:'#10b981',o:'Izquierda'},
+  '41':{n:'Mov. Independiente',c:'#a3e635',o:'Centro'},
+  '43':{n:'MIRA',c:'#a855f7',o:'Centro'},
+  '44':{n:'Coalición Norte',c:'#6366f1',o:'Centro'},
+  '51':{n:'Mov. Region',c:'#84cc16',o:'Centro'},
   '52':{n:'Alianza Verde',c:'#22c55e',o:'Centroizquierda'},
-  '53':{n:'Pacto Historico',c:'#ef4444',o:'Izquierda'},
+  '53':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
+  '55':{n:'Fuerza del Pueblo',c:'#dc2626',o:'Izquierda'},
+  '57':{n:'Alianza Verde',c:'#22c55e',o:'Centroizquierda'},
   '58':{n:'Col. Justa Libres',c:'#7c3aed',o:'Derecha'},
   '59':{n:'Col. Justa Libres',c:'#7c3aed',o:'Derecha'},
+  '80':{n:'Mov. Alternativo',c:'#475569',o:'Centro'},
+  '81':{n:'Mov. Independiente',c:'#64748b',o:'Centro'},
   '84':{n:'Nuevo Liberalismo',c:'#fb923c',o:'Centro'},
   '85':{n:'Colombia Humana',c:'#dc2626',o:'Izquierda'},
-  '93':{n:'Pacto Historico',c:'#ef4444',o:'Izquierda'},
+  '86':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
+  '89':{n:'Mov. Regional',c:'#818cf8',o:'Centro'},
+  '90':{n:'Mov. Ciudadano',c:'#34d399',o:'Centro'},
+  '91':{n:'Col. Renaciente',c:'#f43f5e',o:'Centroizquierda'},
+  '92':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
+  '93':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
   '98':{n:'AICO',c:'#10b981',o:'Izquierda'},
+  '100':{n:'Mov. Colombia',c:'#e2e8f0',o:'Centro'},
   '107':{n:'Paz Colombia',c:'#34d399',o:'Centroizquierda'},
+  '113':{n:'Mov. Alternativo',c:'#94a3b8',o:'Centro'},
   '124':{n:'Centro Esperanza',c:'#4ade80',o:'Centroizquierda'},
+  '170':{n:'Coalición Sindical',c:'#f59e0b',o:'Centroizquierda'},
 };
 function getParty(codpar){ return PC[String(codpar)]||{n:'Partido '+codpar,c:'#64748b',o:'Centro'}; }
 
@@ -973,15 +993,25 @@ async function fetchAndShowDeptLive(dpto){
     if(!r.ok) throw Error(r.status);
     const data=await r.json();
     const cam=data.camaras?.[0];
-    if(!cam?.partotabla) throw Error('no data');
+    if(!cam?.partotabla?.length) throw Error('no data');
     const items=cam.partotabla
       .map(p=>{const a=p.act;const party=getParty(a.codpar);return{label:party.n,value:parseInt(a.vot||0),color:party.c};})
       .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
     document.getElementById('rp-dept-title').textContent=`${dname} — 2026 en vivo`;
     fillChart(chartRDept,items);
   }catch(e){
-    document.getElementById('rp-dept-title').textContent=`${dname} — sin datos en vivo`;
-    clearChart(chartRDept);
+    // Fallback: show from mapagan (national data already loaded)
+    const liveData=corp==='senado'?API_SE:API_CA;
+    const mapagan=(liveData?.camaras?.[0]?.mapagan)||[];
+    const m=mapagan.find(x=>AMB_TO_DPTO[x.amb]===dpto);
+    if(m){
+      const party=getParty(m.codpar);
+      document.getElementById('rp-dept-title').textContent=`${dname} — ganador dpto 2026`;
+      fillChart(chartRDept,[{label:party.n,value:parseInt(m.vot||0),color:party.c}]);
+    } else {
+      document.getElementById('rp-dept-title').textContent=`${dname} — sin datos en vivo`;
+      clearChart(chartRDept);
+    }
   }
 }
 

@@ -62,36 +62,57 @@ class handler(BaseHTTPRequestHandler):
 
         target_url = f"{REGISTRADURIA_BASE}/{raw_path}.json"
 
-        try:
-            req = urllib.request.Request(
-                target_url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    "Accept": "application/json, text/plain, */*",
-                    "Accept-Language": "es-CO,es;q=0.9,en;q=0.8",
-                    "Referer": "https://resultados.registraduria.gov.co/",
-                    "Origin": "https://resultados.registraduria.gov.co",
-                    "Connection": "keep-alive",
-                    "Cache-Control": "no-cache",
-                },
-            )
-            import ssl
-            ctx = ssl.create_default_context()
-            # Desactivar verificación estricta para compatibilidad con cert de Registraduría
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
-                data = resp.read()
-                content_type = resp.headers.get("Content-Type", "application/json")
+        # Headers que imitan un navegador colombiano para evitar bloqueos geográficos
+        BROWSER_HEADERS = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "es-CO,es;q=0.9,en;q=0.8",
+            "Referer": "https://resultados.registraduria.gov.co/",
+            "Origin": "https://resultados.registraduria.gov.co",
+            "Connection": "keep-alive",
+            "Cache-Control": "no-cache",
+            "X-Forwarded-For": "190.24.0.1",  # IP colombiana simulada
+        }
 
-        except urllib.error.HTTPError as e:
-            self._error(e.code, f"Error Registraduría HTTP {e.code}: {e.reason} — url={target_url}")
-            return
-        except urllib.error.URLError as e:
-            self._error(502, f"No se pudo conectar: {e.reason} — url={target_url}")
-            return
-        except Exception as e:
-            self._error(500, f"Error proxy: {type(e).__name__}: {str(e)} — url={target_url}")
+        import ssl, http.client, urllib.parse as up
+
+        data = None
+        last_error = None
+
+        # Intentar primero con urllib (más simple), luego con http.client (más control)
+        for attempt in range(2):
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(target_url, headers=BROWSER_HEADERS)
+                with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
+                    data = resp.read()
+                break
+            except urllib.error.HTTPError as e:
+                last_error = ("http", e.code, f"{e.reason}")
+                break  # HTTP error — no reintentar
+            except Exception as e:
+                last_error = ("conn", 502, str(e))
+                # Segundo intento con http.client directo
+                try:
+                    parsed = up.urlparse(target_url)
+                    conn = http.client.HTTPSConnection(parsed.netloc, timeout=20, context=ctx)
+                    conn.request("GET", parsed.path, headers=BROWSER_HEADERS)
+                    r2 = conn.getresponse()
+                    if r2.status == 200:
+                        data = r2.read()
+                        last_error = None
+                    else:
+                        last_error = ("http", r2.status, r2.reason)
+                    conn.close()
+                except Exception as e2:
+                    last_error = ("conn", 502, str(e2))
+                break
+
+        if last_error:
+            kind, code, msg = last_error
+            self._error(code, f"Error {kind}: {msg} — url={target_url}")
             return
 
         # ── Respuesta exitosa ─────────────────────────────────────────────────
