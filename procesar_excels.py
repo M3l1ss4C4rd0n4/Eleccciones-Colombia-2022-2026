@@ -354,6 +354,84 @@ cam22_cand_dep = agrupar_candidatos_dep(df_cam22[df_cam22["códigocandidato"] !=
                                         "dep", "nombrecandidato", "partido_clean", "totalvotos")
 print(f"  → Cámara 2022: {len(df_cam22):,} filas | {len(cam22_gan)} dptos | {len(cam22_nac)} partidos")
 
+# ── Curules OFICIALES 2022 (hoja 'Curules') ──────────────────────────────────
+print("\n[4b/5] Leyendo curules oficiales 2022 (hoja Curules) …")
+df_cur = pd.read_excel("votos_agregados_2022.xlsx", sheet_name="Curules", header=None)
+
+# ── Senado nacional: filas 2-9 (col1=partido, col2=curules)
+sen22_curules_nac = []
+for _, row in df_cur.iloc[2:].iterrows():
+    p = str(row[1]).strip() if pd.notna(row[1]) else ""
+    c = row[2]
+    if not p or p in ("CAMARA", "DEPARTAMENTO", "nan"):
+        break
+    if pd.notna(c):
+        try:
+            pnorm = normalizar_partido(p) or p
+            col = COLOR_MAP.get(pnorm, "#64748b")
+            sen22_curules_nac.append({"partido": pnorm, "curules": int(c), "color": col})
+        except (ValueError, TypeError):
+            pass
+
+# ── Cámara por departamento: filas desde cabecera (col1=dpto, col2=partido, col3=curules)
+# Clave: código DANE de 2 dígitos (str) para lookup directo desde JS con código DANE
+EXCEL_DPTO_TO_DANE = {
+    'Amazonas': '91', 'Antioquia': '05', 'Arauca': '81', 'Atlántico': '08',
+    'Bogotá D.C.': '11', 'Bolívar': '13', 'Boyacá': '15', 'Caldas': '17',
+    'Caquetá': '18', 'Casanare': '85', 'Cauca': '19', 'Cesar': '20',
+    'Choco': '27', 'Córdoba': '23', 'Cundinamarca': '25', 'Guainia': '94',
+    'Guaviare': '95', 'Huila': '41', 'La Guajira': '44', 'Magdalena': '47',
+    'Meta': '50', 'Nariño': '52', 'Norte de Santander': '54', 'Putumayo': '86',
+    'Quindio': '63', 'Risaralda': '66', 'San Andrés y Providencia': '88',
+    'Santander': '68', 'Sucre': '70', 'Tolima': '73', 'Valle del Cauca': '76',
+    'Vaupés': '97', 'Vichada': '99'
+}
+cam22_curules_dep = {}           # {dane_code: [{partido, curules, color}]}
+cur_dpto_actual = None           # nombre del Excel (para lookup en EXCEL_DPTO_TO_DANE)
+for _, row in df_cur.iterrows():
+    col0 = str(row[1]).strip() if pd.notna(row[1]) else ""
+    col1 = str(row[2]).strip() if pd.notna(row[2]) else ""
+    col2 = row[3]
+    if col0 == "DEPARTAMENTO":   # cabecera
+        continue
+    if col0 == "CAMARA" or col0 == "SENADO":
+        continue
+    # Si col1 tiene valor numérico → es un campo de curules de una fila senado → skip
+    if col0 and not col1 and not pd.notna(col2):
+        continue
+    # Detectar dpto: col0 tiene texto y col1 tiene texto de partido
+    if col0 and col1 and pd.notna(col2):
+        cur_dpto_actual = col0
+        dane = EXCEL_DPTO_TO_DANE.get(col0)
+        if not dane:
+            continue
+        pnorm = normalizar_partido(col1) or col1
+        col = COLOR_MAP.get(pnorm, "#64748b")
+        if dane not in cam22_curules_dep:
+            cam22_curules_dep[dane] = []
+        try:
+            cam22_curules_dep[dane].append({
+                "partido": pnorm, "curules": int(col2), "color": col
+            })
+        except (ValueError, TypeError):
+            pass
+    elif not col0 and col1 and pd.notna(col2) and cur_dpto_actual:
+        # Fila de continuación del mismo departamento (col0 vacío)
+        dane = EXCEL_DPTO_TO_DANE.get(cur_dpto_actual)
+        if not dane:
+            continue
+        pnorm = normalizar_partido(col1) or col1
+        col = COLOR_MAP.get(pnorm, "#64748b")
+        try:
+            cam22_curules_dep[dane].append({
+                "partido": pnorm, "curules": int(col2), "color": col
+            })
+        except (ValueError, TypeError):
+            pass
+
+print(f"  → Senado curules: {len(sen22_curules_nac)} partidos = {sum(x['curules'] for x in sen22_curules_nac)} escaños")
+print(f"  → Cámara curules: {len(cam22_curules_dep)} departamentos = {sum(sum(p['curules'] for p in v) for v in cam22_curules_dep.values())} escaños (territoriales)")
+
 # ── 5/5 PRESIDENCIALES 2022 ──────────────────────────────────────────────────
 print("\n[5/5] Leyendo Presidenciales 2022 …")
 df_p22 = pd.read_excel("Presidencia 2022.xlsx", sheet_name="Resultados")
@@ -418,12 +496,14 @@ historico = {
                 "departamentos":     cam22_dep,
                 "ganadores":         cam22_gan,
                 "candidatos_dep":    cam22_cand_dep,
+                "curules_dep":       cam22_curules_dep,   # oficiales por dpto (nombre de dpto)
             },
             "senado": {
                 "nacional":          sen22_nac,
                 "departamentos":     sen22_dep,
                 "ganadores":         sen22_gan,
                 "candidatos_dep":    sen22_cand_dep,
+                "curules_nac":       sen22_curules_nac,   # oficiales nacionales
             },
         },
         # El Congreso 2026 general no está disponible en los Excel;

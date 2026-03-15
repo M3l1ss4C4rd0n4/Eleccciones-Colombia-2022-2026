@@ -1451,10 +1451,11 @@ function refreshDeptChart(){
 // Escaños de Cámara de Representantes por departamento (DPTO DANE → seats)
 // Asignación 2022-2026 (Ley 1475 y redistribución)
 const CAMARA_SEATS_BY_DPTO = {
-  '05':17,'08':7,'11':18,'13':6,'15':6,'17':4,'18':2,'19':4,'20':4,
-  '23':7,'25':7,'27':2,'41':4,'44':3,'47':5,'50':3,'52':6,'54':5,
-  '63':2,'66':4,'68':7,'70':3,'73':5,'76':13,'81':2,'85':2,'86':2,
-  '88':2,'91':2,'94':1,'95':1,'97':1,'99':1
+  // Fuente: hoja "Curules" de votos_agregados_2022.xlsx (escaños territoriales 2022)
+  '05':17,'08':7,'11':18,'13':6,'15':6,'17':5,'18':2,'19':4,'20':4,
+  '23':5,'25':7,'27':2,'41':4,'44':2,'47':5,'50':3,'52':5,'54':5,
+  '63':3,'66':4,'68':7,'70':3,'73':6,'76':13,'81':2,'85':2,'86':2,
+  '88':2,'91':2,'94':2,'95':2,'97':2,'99':2
 };
 
 async function fetchAndShowDeptLive(dpto){
@@ -1584,52 +1585,37 @@ const PARTY_ALIAS = {
 function normParty(name){ return PARTY_ALIAS[name]||name; }
 
 function getCurules2022Nacional(corp){
-  // Calcula curules 2022 via D'Hondt a partir de votos nacionales en historico.json
+  // Usa datos oficiales del Excel (hoja Curules) almacenados en historico.json
   if(!HIST) return [];
-  const hc = corp==='senado' ? HIST.congreso?.['2022']?.senado : HIST.congreso?.['2022']?.camara;
-  if(!hc?.nacional?.length) return [];
-  const totalSeats = corp==='senado' ? 100 : 188;
-  const umbralPct  = corp==='senado' ? 0.03 : 0.02;
-  const totalVotes = hc.nacional.reduce((s,p)=>s+p.votos,0);
-  if(!totalVotes) return [];
-  const eligible = hc.nacional.filter(p=>p.votos >= totalVotes*umbralPct);
-  const seats={};
-  eligible.forEach(p=>{ seats[p.partido]=0; });
-  for(let i=0;i<totalSeats;i++){
-    let best=-1,winner=null;
-    for(const p of eligible){ const q=p.votos/(seats[p.partido]+1); if(q>best){best=q;winner=p.partido;} }
-    if(winner) seats[winner]++;
+  if(corp==='senado'){
+    const cur = HIST.congreso?.['2022']?.senado?.curules_nac || [];
+    return cur
+      .sort((a,b)=>b.curules-a.curules)
+      .map(p=>({label:p.partido, value:p.curules, color:bestColor(p.partido,p.color)||'#64748b'}));
+  } else {
+    // Cámara: agregar curules oficiales por departamento -> total nacional
+    const depData = HIST.congreso?.['2022']?.camara?.curules_dep || {};
+    const sums = {};
+    for(const arr of Object.values(depData)){
+      for(const p of arr){
+        if(!sums[p.partido]) sums[p.partido]={total:0,color:p.color};
+        sums[p.partido].total += p.curules;
+      }
+    }
+    return Object.entries(sums)
+      .sort((a,b)=>b[1].total-a[1].total)
+      .map(([partido,d])=>({label:partido, value:d.total, color:bestColor(partido,d.color)||'#64748b'}));
   }
-  return eligible
-    .filter(p=>seats[p.partido]>0)
-    .sort((a,b)=>seats[b.partido]-seats[a.partido])
-    .map(p=>({label:p.partido,value:seats[p.partido],color:bestColor(p.partido,p.color)||'#64748b'}));
 }
 
-// Calcula curules Cámara 2022 para un departamento via D'Hondt desde votos históricos
+// Retorna curules Cámara 2022 para un departamento desde datos oficiales del Excel
 function getCurulesCamaraDept(dpto){
-  // dpto es código DANE (ej: '05'); histKey es código Registraduría (ej: '01')
-  const histKey = DPTO_TO_HIST[dpto] || dpto;
+  // dpto es código DANE de 2 dígitos (ej: '05')
   if(!HIST) return [];
-  const arr = HIST.congreso?.['2022']?.camara?.departamentos?.[histKey] || [];
-  if(!arr.length) return [];
-  const totalSeats = CAMARA_SEATS_BY_DPTO[dpto] || 0;
-  if(!totalSeats) return [];
-  const totalVotes = arr.reduce((s,p)=>s+p.votos,0);
-  if(!totalVotes) return [];
-  // Sin umbral mínimo a nivel departamental (umbral=0)
-  const eligible = arr.filter(p=>p.votos>0);
-  const seats={};
-  eligible.forEach(p=>{ seats[p.partido]=0; });
-  for(let i=0;i<totalSeats;i++){
-    let best=-1,winner=null;
-    for(const p of eligible){ const q=p.votos/(seats[p.partido]+1); if(q>best){best=q;winner=p.partido;} }
-    if(winner) seats[winner]++;
-  }
-  return eligible
-    .filter(p=>seats[p.partido]>0)
-    .sort((a,b)=>seats[b.partido]-seats[a.partido])
-    .map(p=>({label:p.partido,value:seats[p.partido],color:bestColor(p.partido,p.color)||'#64748b'}));
+  const arr = HIST.congreso?.['2022']?.camara?.curules_dep?.[dpto] || [];
+  return arr
+    .sort((a,b)=>b.curules-a.curules)
+    .map(p=>({label:p.partido, value:p.curules, color:bestColor(p.partido,p.color)||'#64748b'}));
 }
 
 // Llena el chart nacional del panel derecho con datos live
