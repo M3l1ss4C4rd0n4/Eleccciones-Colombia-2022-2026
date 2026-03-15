@@ -555,7 +555,10 @@ async function fetchLiveData() {
   show('right-spinner',true);
   try {
     const r = await fetch(`/api/registraduria_proxy?path=${path}`);
-    if(!r.ok) throw Error(r.status);
+    if(!r.ok) {
+      const errBody = await r.json().catch(()=>({error:r.status}));
+      throw Error(errBody.error||r.status);
+    }
     const d = await r.json();
     if(corp==='senado') API_SE=d; else API_CA=d;
     document.getElementById('update-time').textContent = d.mdhm ? 'Act: '+d.mdhm : '';

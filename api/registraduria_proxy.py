@@ -71,22 +71,27 @@ class handler(BaseHTTPRequestHandler):
                     "Accept-Language": "es-CO,es;q=0.9,en;q=0.8",
                     "Referer": "https://resultados.registraduria.gov.co/",
                     "Origin": "https://resultados.registraduria.gov.co",
+                    "Connection": "keep-alive",
+                    "Cache-Control": "no-cache",
                 },
             )
             import ssl
             ctx = ssl.create_default_context()
-            with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            # Desactivar verificación estricta para compatibilidad con cert de Registraduría
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
                 data = resp.read()
                 content_type = resp.headers.get("Content-Type", "application/json")
 
         except urllib.error.HTTPError as e:
-            self._error(e.code, f"Error Registraduría: {e.reason}")
+            self._error(e.code, f"Error Registraduría HTTP {e.code}: {e.reason} — url={target_url}")
             return
         except urllib.error.URLError as e:
-            self._error(502, f"No se pudo conectar a la Registraduría: {e.reason}")
+            self._error(502, f"No se pudo conectar: {e.reason} — url={target_url}")
             return
         except Exception as e:
-            self._error(500, f"Error interno del proxy: {str(e)}")
+            self._error(500, f"Error proxy: {type(e).__name__}: {str(e)} — url={target_url}")
             return
 
         # ── Respuesta exitosa ─────────────────────────────────────────────────
