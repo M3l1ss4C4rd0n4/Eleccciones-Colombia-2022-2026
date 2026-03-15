@@ -90,7 +90,6 @@ nav button.active{color:#58a6ff;border-bottom-color:#58a6ff}
     <option value="Izquierda">Izquierda</option>
     <option value="Centroizquierda">Centroizquierda</option>
     <option value="Centro">Centro</option>
-    <option value="Centroderecha">Centroderecha</option>
     <option value="Derecha">Derecha</option>
   </select>
   <span id="api-status"></span>
@@ -169,17 +168,17 @@ const DPTO_TO_HIST = Object.fromEntries(
 // PARTY CATALOG: codpar (string) → {name, color, ori}
 // ═══════════════════════════════════════════════════════════
 const PC = {
-  '2': {n:'Partido Liberal',         c:'#e85d04', o:'Centroizquierda'},
-  '3': {n:'P. Conservador',          c:'#1864ab', o:'Centroderecha'},
-  '4': {n:'Partido de la U',         c:'#e67700', o:'Centro'},
-  '5': {n:'Partido de la U',         c:'#e67700', o:'Centro'},
+  '2': {n:'Partido Liberal',         c:'#e85d04', o:'Centro'},
+  '3': {n:'P. Conservador',          c:'#1864ab', o:'Derecha'},
+  '4': {n:'Partido de la U',         c:'#e67700', o:'Derecha'},
+  '5': {n:'Partido de la U',         c:'#e67700', o:'Derecha'},
   '6': {n:'MAIS',                    c:'#2b8a3e', o:'Izquierda'},
-  '7': {n:'MIRA',                    c:'#9c36b5', o:'Centro'},
-  '8': {n:'ASI',                     c:'#495057', o:'Centro'},
+  '7': {n:'MIRA',                    c:'#9c36b5', o:'Derecha'},
+  '8': {n:'ASI',                     c:'#495057', o:'Centroizquierda'},
   '9': {n:'La Fuerza de la Paz',     c:'#d63384', o:'Izquierda'},
-  '10':{n:'Cambio Radical',          c:'#0c7ead', o:'Centroderecha'},
+  '10':{n:'Cambio Radical',          c:'#0c7ead', o:'Derecha'},
   '15':{n:'Mov. MIO',                c:'#20c997', o:'Centro'},
-  '16':{n:'Fuerza y Corazon',        c:'#fd7e14', o:'Centroderecha'},
+  '16':{n:'Fuerza y Corazon',        c:'#fd7e14', o:'Derecha'},
   '17':{n:'Centro Democratico',      c:'#1e2b4a', o:'Derecha'},
   '20':{n:'Opcion Ciudadana',        c:'#74b9ff', o:'Centro'},
   '22':{n:'Somos Region',            c:'#74c69d', o:'Centro'},
@@ -191,10 +190,10 @@ const PC = {
   '42':{n:'Mov. Verde Oxigeno',      c:'#2b8a3e', o:'Centro'},
   '45':{n:'Colombia Humana Reg.',    c:'#c92a2a', o:'Izquierda'},
   '46':{n:'Mov. Alternativo',        c:'#6ea8fe', o:'Izquierda'},
-  '51':{n:'Partido Liberal Reg.',    c:'#e85d04', o:'Centroizquierda'},
-  '52':{n:'Alianza Verde',           c:'#2f9e44', o:'Centroizquierda'},
+  '51':{n:'Partido Liberal Reg.',    c:'#e85d04', o:'Centro'},
+  '52':{n:'Alianza Verde',           c:'#2f9e44', o:'Centro'},
   '53':{n:'Pacto Historico',         c:'#c92a2a', o:'Izquierda'},
-  '54':{n:'Nuevo Liberalismo Reg.',  c:'#fd7e14', o:'Centro'},
+  '54':{n:'Nuevo Liberalismo Reg.',  c:'#b45309', o:'Centro'},
   '58':{n:'Col. Justa Libres',       c:'#5f3dc4', o:'Derecha'},
   '59':{n:'Col. Justa Libres',       c:'#5f3dc4', o:'Derecha'},
   '61':{n:'Mov. Independiente',      c:'#6f42c1', o:'Centro'},
@@ -204,10 +203,10 @@ const PC = {
   '78':{n:'Republica Comun',         c:'#1e2b4a', o:'Derecha'},
   '80':{n:'Somos Pacifico',          c:'#2b8a3e', o:'Centroizquierda'},
   '81':{n:'Colombia Somos Todos',    c:'#0c7ead', o:'Centro'},
-  '84':{n:'Nuevo Liberalismo',       c:'#fd7e14', o:'Centro'},
+  '84':{n:'Nuevo Liberalismo',       c:'#b45309', o:'Centro'},
   '85':{n:'Colombia Humana',         c:'#c92a2a', o:'Izquierda'},
-  '86':{n:'Nuevo Liberalismo',       c:'#fd7e14', o:'Centro'},
-  '89':{n:'Alianza Verde Reg.',      c:'#2f9e44', o:'Centroizquierda'},
+  '86':{n:'Nuevo Liberalismo',       c:'#b45309', o:'Centro'},
+  '89':{n:'Alianza Verde Reg.',      c:'#2f9e44', o:'Centro'},
   '90':{n:'Potencial Ciudadano',     c:'#6ea8fe', o:'Centro'},
   '91':{n:'Mov. Civico Cundinamarca',c:'#0c7ead', o:'Centro'},
   '93':{n:'Pacto Historico',         c:'#c92a2a', o:'Izquierda'},
@@ -217,7 +216,7 @@ const PC = {
   '99':{n:'Caqueta Primero',         c:'#6ea8fe', o:'Centro'},
   '103':{n:'Alianza Ciudadana',      c:'#6ea8fe', o:'Centro'},
   '107':{n:'Paz Colombia',           c:'#2b8a3e', o:'Centroizquierda'},
-  '112':{n:'Col. Mas Segura',        c:'#0c7ead', o:'Centroderecha'},
+  '112':{n:'Col. Mas Segura',        c:'#0c7ead', o:'Derecha'},
   '113':{n:'Acierta Colombia',       c:'#6ea8fe', o:'Centro'},
   '119':{n:'Mov. Firmes',            c:'#adb5bd', o:'Centro'},
   '124':{n:'Centro Esperanza',       c:'#2b8a3e', o:'Centroizquierda'},
@@ -241,7 +240,7 @@ const NAMED_COLORS = {
   'Partido de la U':'#e67700','P. de la U':'#e67700',
   'Alianza Verde':'#2f9e44','Col. Justa Libres':'#5f3dc4',
   'Colombia Justa Libres':'#5f3dc4','Colombia Humana':'#c92a2a',
-  'Nuevo Liberalismo':'#fd7e14','Centro Esperanza':'#2b8a3e',
+  'Nuevo Liberalismo':'#b45309','Centro Esperanza':'#2b8a3e',
   'Coalici\u00f3n Centro Esperanza':'#2b8a3e','Equipo por Colombia':'#1864ab',
   'Liga Gobernantes':'#f59e0b','Gustavo Petro':'#c92a2a',
   'Rodolfo Hern\u00e1ndez':'#f59e0b','Federico Guti\u00e9rrez':'#1864ab',
@@ -466,11 +465,13 @@ function paintHistMap(map,oldLayer,departamentos,orient,side,isCandidato){
   for(const [rawDept,arr] of Object.entries(departamentos)){
     // translate internal registraduria code → DANE/GeoJSON DPTO code
     const dpto=HIST_TO_DPTO[pad2(rawDept)]||pad2(rawDept);
-    const filtered=orient==='todas'?arr:arr.filter(p=>(p.orientacion||'')=== orient);
-    if(!filtered.length) continue;
-    const sorted=[...filtered].sort((a,b)=>b.votos-a.votos);
-    const total=sorted.reduce((s,p)=>s+p.votos,0);
+    if(!arr||!arr.length) continue;
+    // Always determine the OVERALL winner first (no orientation filter)
+    const sorted=[...arr].sort((a,b)=>b.votos-a.votos);
     const top=sorted[0];
+    // Only colour this dept if the overall winner belongs to the selected orientation
+    if(orient!=='todas' && (top.orientacion||'')!==orient) continue;
+    const total=arr.reduce((s,p)=>s+p.votos,0);
     const name=isCandidato?(top.candidato||top.partido):top.partido;
     winners[dpto]={
       name, color:top.color||namedColor(name),

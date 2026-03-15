@@ -260,7 +260,6 @@ body{
       <option value="Izquierda">Izquierda</option>
       <option value="Centroizquierda">Centroizquierda</option>
       <option value="Centro">Centro</option>
-      <option value="Centroderecha">Centroderecha</option>
       <option value="Derecha">Derecha</option>
     </select>
   </div>
@@ -390,17 +389,17 @@ const DPTO_TO_HIST = Object.fromEntries(
 
 // Catalogo de partidos (codpar → {n,c,o})
 const PC = {
-  '2':{n:'Partido Liberal',c:'#f97316',o:'Centroizquierda'},
-  '3':{n:'P. Conservador',c:'#3b82f6',o:'Centroderecha'},
-  '4':{n:'Partido de la U',c:'#f59e0b',o:'Centro'},
-  '5':{n:'Partido de la U',c:'#f59e0b',o:'Centro'},
+  '2':{n:'Partido Liberal',c:'#f97316',o:'Centro'},
+  '3':{n:'P. Conservador',c:'#3b82f6',o:'Derecha'},
+  '4':{n:'Partido de la U',c:'#f59e0b',o:'Derecha'},
+  '5':{n:'Partido de la U',c:'#f59e0b',o:'Derecha'},
   '6':{n:'MAIS',c:'#10b981',o:'Izquierda'},
-  '7':{n:'MIRA',c:'#a855f7',o:'Centro'},
-  '8':{n:'ASI',c:'#94a3b8',o:'Centro'},
+  '7':{n:'MIRA',c:'#a855f7',o:'Derecha'},
+  '8':{n:'ASI',c:'#94a3b8',o:'Centroizquierda'},
   '9':{n:'La Fuerza de la Paz',c:'#ec4899',o:'Izquierda'},
-  '10':{n:'Cambio Radical',c:'#06b6d4',o:'Centroderecha'},
+  '10':{n:'Cambio Radical',c:'#06b6d4',o:'Derecha'},
   '15':{n:'Mov. MIO',c:'#14b8a6',o:'Centro'},
-  '16':{n:'Fuerza y Corazon',c:'#fb923c',o:'Centroderecha'},
+  '16':{n:'Fuerza y Corazon',c:'#fb923c',o:'Derecha'},
   '17':{n:'Centro Democratico',c:'#38bdf8',o:'Derecha'},
   '20':{n:'Opcion Ciudadana',c:'#7dd3fc',o:'Centro'},
   '22':{n:'Somos Region',c:'#6ee7b7',o:'Centro'},
@@ -411,23 +410,23 @@ const PC = {
   '39':{n:'Mov. Ciudadano',c:'#7dd3fc',o:'Centroizquierda'},
   '40':{n:'MAIS',c:'#10b981',o:'Izquierda'},
   '41':{n:'Mov. Independiente',c:'#a3e635',o:'Centro'},
-  '43':{n:'MIRA',c:'#a855f7',o:'Centro'},
+  '43':{n:'MIRA',c:'#a855f7',o:'Derecha'},
   '44':{n:'Coalición Norte',c:'#6366f1',o:'Centro'},
   '51':{n:'Mov. Region',c:'#84cc16',o:'Centro'},
-  '52':{n:'Alianza Verde',c:'#22c55e',o:'Centroizquierda'},
+  '52':{n:'Alianza Verde',c:'#22c55e',o:'Centro'},
   '53':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
   '55':{n:'Fuerza del Pueblo',c:'#dc2626',o:'Izquierda'},
-  '57':{n:'Alianza Verde',c:'#22c55e',o:'Centroizquierda'},
+  '57':{n:'Alianza Verde',c:'#22c55e',o:'Centro'},
   '58':{n:'Col. Justa Libres',c:'#7c3aed',o:'Derecha'},
   '59':{n:'Col. Justa Libres',c:'#7c3aed',o:'Derecha'},
   '80':{n:'Mov. Alternativo',c:'#475569',o:'Centro'},
   '81':{n:'Mov. Independiente',c:'#64748b',o:'Centro'},
-  '84':{n:'Nuevo Liberalismo',c:'#fb923c',o:'Centro'},
+  '84':{n:'Nuevo Liberalismo',c:'#b45309',o:'Centro'},
   '85':{n:'Colombia Humana',c:'#dc2626',o:'Izquierda'},
-  '86':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
+  '86':{n:'Nuevo Liberalismo',c:'#b45309',o:'Centro'},
   '89':{n:'Mov. Regional',c:'#818cf8',o:'Centro'},
   '90':{n:'Mov. Ciudadano',c:'#34d399',o:'Centro'},
-  '91':{n:'Col. Renaciente',c:'#f43f5e',o:'Centroizquierda'},
+  '91':{n:'Col. Renaciente',c:'#f43f5e',o:'Derecha'},
   '92':{n:'Pacto Histórico',c:'#ef4444',o:'Izquierda'},
   '99':{n:'Mov. Regional',c:'#818cf8',o:'Centro'},
   '112':{n:'Mov. Cívico',c:'#6366f1',o:'Centro'},
@@ -445,7 +444,7 @@ const PC = {
   '170':{n:'Coalición Sindical',c:'#f59e0b',o:'Centroizquierda'},
   // Consultas interpartidistas presidenciales 2026
   '30':{n:'Consulta Claudia López',c:'#ec4899',o:'Centroizquierda'},
-  '31':{n:'La Gran Consulta',c:'#f59e0b',o:'Centroderecha'},
+  '31':{n:'La Gran Consulta',c:'#f59e0b',o:'Derecha'},
   '32':{n:'Consulta Pacto Histórico',c:'#dc2626',o:'Izquierda'},
 };
 // Para partidos sin nombre conocido, genera un color único y determinista
@@ -475,7 +474,7 @@ const NAMED_COLORS = {
   'Alianza Verde':'#22c55e','Partido Verde':'#22c55e',
   'Col. Justa Libres':'#7c3aed','Colombia Justa Libres':'#7c3aed',
   'MIRA \u2013 Colombia Justa Libres':'#7c3aed','MIRA-Col. Justa Libres':'#7c3aed',
-  'Colombia Humana':'#dc2626','Nuevo Liberalismo':'#fb923c',
+  'Colombia Humana':'#dc2626','Nuevo Liberalismo':'#b45309',
   'Centro Esperanza':'#4ade80','Coalici\u00f3n Centro Esperanza':'#4ade80',
   'Equipo por Colombia':'#3b82f6','Liga Gobernantes':'#eab308',
   'Liga de Gobernantes Anticorrupci\u00f3n':'#eab308',
@@ -1177,11 +1176,13 @@ function paintHistMap(map,oldLayer,departamentos,orient,side,isCandidato){
   const winners={};
   for(const [rawDept,arr] of Object.entries(departamentos)){
     const dpto=HIST_TO_DPTO[pad2(rawDept)]||pad2(rawDept);
-    const filtered=orient==='todas'?arr:arr.filter(p=>(p.orientacion||'')===orient);
-    if(!filtered.length) continue;
-    const sorted=[...filtered].sort((a,b)=>b.votos-a.votos);
-    const total=sorted.reduce((s,p)=>s+p.votos,0);
+    if(!arr||!arr.length) continue;
+    // Always determine the OVERALL winner first (no orientation filter)
+    const sorted=[...arr].sort((a,b)=>b.votos-a.votos);
     const top=sorted[0];
+    // Only colour this dept if the overall winner belongs to the selected orientation
+    if(orient!=='todas' && (top.orientacion||'')!==orient) continue;
+    const total=arr.reduce((s,p)=>s+p.votos,0);
     const name=isCandidato?(top.candidato||top.partido):top.partido;
     const pct=total>0?(top.votos/total)*100:0;
     winners[dpto]={name,color:bestColor(name,top.color),pct,arr:sorted,vot:top.votos};
@@ -1385,6 +1386,15 @@ function refreshDeptChart(){
   }
 }
 
+// Escaños de Cámara de Representantes por departamento (DPTO DANE → seats)
+// Asignación 2022-2026 (Ley 1475 y redistribución)
+const CAMARA_SEATS_BY_DPTO = {
+  '05':17,'08':7,'11':18,'13':6,'15':6,'17':4,'18':2,'19':4,'20':4,
+  '23':7,'25':7,'27':2,'41':4,'44':3,'47':5,'50':3,'52':6,'54':5,
+  '63':2,'66':4,'68':7,'70':3,'73':5,'76':13,'81':2,'85':2,'86':2,
+  '88':2,'91':2,'94':1,'95':1,'97':1,'99':1
+};
+
 async function fetchAndShowDeptLive(dpto){
   // Determina corporación según pestaña activa
   let corp;
@@ -1415,7 +1425,8 @@ async function fetchAndShowDeptLive(dpto){
     // Curules estimadas por depto (solo Cámara)
     const rpDcurWrap=document.getElementById('rp-dcur-wrap');
     if(corp!=='senado'){
-      const totalDptoSeats=parseInt(cam.cargtota||cam.carg||0);
+      // Use API seat count if available; fall back to the official fixed allocation
+      const totalDptoSeats=parseInt(cam.cargtota||0)||parseInt(cam.carg||0)||CAMARA_SEATS_BY_DPTO[dpto]||0;
       if(totalDptoSeats>0){
         const dcur=computeEstimatedCurules({camaras:[cam]},totalDptoSeats,0,'todas');
         if(dcur.length){
@@ -1551,19 +1562,22 @@ function computeEstimatedCurules(liveData, totalSeats, umbral, orient) {
   const tot = parseInt(cam.totales?.act?.votcan||0);
   if(!tot) return [];
   const thresh = tot * umbral;
-  const eligible = cam.partotabla
+  // D'Hondt ALWAYS runs on ALL parties above the threshold (ignoring orientation),
+  // because seats are distributed across the full parliament — not just one bloc.
+  const allEligible = cam.partotabla
     .map(p=>{ const a=p.act; const party=getParty(a.codpar); return {codpar:a.codpar,vot:parseInt(a.vot||0),n:party.n,c:party.c,o:party.o}; })
-    .filter(p=>p.vot>=thresh&&(orient==='todas'||p.o===orient));
-  if(!eligible.length) return [];
+    .filter(p=>p.vot>=thresh);
+  if(!allEligible.length) return [];
   const seats={};
-  eligible.forEach(p=>seats[p.codpar]=0);
+  allEligible.forEach(p=>seats[p.codpar]=0);
   for(let i=0;i<totalSeats;i++){
     let best=-1,winner=null;
-    for(const p of eligible){ const q=p.vot/(seats[p.codpar]+1); if(q>best){best=q;winner=p.codpar;} }
+    for(const p of allEligible){ const q=p.vot/(seats[p.codpar]+1); if(q>best){best=q;winner=p.codpar;} }
     if(winner) seats[winner]++;
   }
-  return eligible
-    .filter(p=>seats[p.codpar]>0)
+  // Filter output by orientation for display only — seats are already correctly shared
+  return allEligible
+    .filter(p=>seats[p.codpar]>0&&(orient==='todas'||p.o===orient))
     .sort((a,b)=>seats[b.codpar]-seats[a.codpar])
     .map(p=>({label:p.n,value:seats[p.codpar],color:p.c}));
 }
