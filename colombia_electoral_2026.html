@@ -773,12 +773,28 @@ function switchToDoughnut(chart){
 }
 // Convierte un chart doughnut de vuelta a barra horizontal
 function switchToBar(chart){
-  if(chart.config.type==='bar') return;
+  if(chart.config.type==='bar'&&chart.config.options.indexAxis==='y') return;
   chart.config.type='bar';
   chart.config.options.indexAxis='y';
   chart.config.options.scales={
     x:{ticks:{color:'#4e6490',font:{size:9,family:'Inter'},callback:v=>fmtK(v)},grid:{color:'rgba(255,255,255,.04)'},border:{display:false}},
     y:{ticks:{color:'#7f9bc7',font:{size:9.5,family:'Inter'},maxRotation:0},grid:{display:false},border:{display:false}}
+  };
+  chart.config.options.plugins.legend={display:false};
+  chart.config.options.plugins.tooltip.callbacks={label:ctx=>' '+fmt(ctx.raw)+' votos'};
+  chart.config.data.datasets[0].borderRadius=5;
+  chart.config.data.datasets[0].borderSkipped=false;
+  delete chart.config.data.datasets[0].hoverOffset;
+  delete chart.config.data.datasets[0].borderWidth;
+  delete chart.config.data.datasets[0].borderColor;
+}
+// Barras VERTICALES (sin indexAxis)
+function switchToVBar(chart){
+  chart.config.type='bar';
+  delete chart.config.options.indexAxis;
+  chart.config.options.scales={
+    x:{ticks:{color:'#7f9bc7',font:{size:8.5,family:'Inter'},maxRotation:35,maxTicksLimit:12},grid:{display:false},border:{display:false}},
+    y:{ticks:{color:'#4e6490',font:{size:9,family:'Inter'},callback:v=>fmtK(v)},grid:{color:'rgba(255,255,255,.04)'},border:{display:false}}
   };
   chart.config.options.plugins.legend={display:false};
   chart.config.options.plugins.tooltip.callbacks={label:ctx=>' '+fmt(ctx.raw)+' votos'};
@@ -884,6 +900,7 @@ function showPresidencialV1Dept(dpto){
   document.getElementById('rp-dept-section').style.display='';
   document.getElementById('rp-dept-title').textContent=`${dname} — 1ª Vuelta 2022`;
   document.getElementById('rp-dcur-wrap').style.display='none';
+  switchToBar(chartRDept);
   fillChart(chartRDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
 }
 
@@ -896,6 +913,7 @@ function showPresidencialV2Dept(dpto){
   const filtered=filterOrient(arr,orient,'orientacion').sort((a,b)=>b.votos-a.votos);
   document.getElementById('rp-dept-section').style.display='';
   document.getElementById('rp-dept-title').textContent=`${dname} — 2ª Vuelta`;
+  switchToBar(chartRDept);
   fillChart(chartRDept,filtered.map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)})));
 }
 
@@ -955,10 +973,10 @@ function getCNNationalCandidates(){
   if(!cam) return [];
   const all=[];
   for(const p of (cam.partotabla||[])){
-    const consulta=getParty(p.act.codpar);
     for(const c of (p.act.cantotabla||[])){
       const vot=parseInt(c.vot||0);
-      if(vot>0) all.push({label:`${c.nomcan} ${c.apecan}`.trim(),value:vot,color:consulta.c});
+      // Color individual por cédula, no por consulta grupal
+      if(vot>0) all.push({label:`${c.nomcan} ${c.apecan}`.trim(),value:vot,color:cnCandColor(c.cedula)});
     }
   }
   return all.sort((a,b)=>b.value-a.value);
@@ -1331,6 +1349,7 @@ async function fetchAndShowDeptLive(dpto){
       .map(p=>{const a=p.act;const party=getParty(a.codpar);return{label:party.n,value:parseInt(a.vot||0),color:party.c};})
       .filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
     document.getElementById('rp-dept-title').textContent=`${dname} — 2026 en vivo`;
+    switchToBar(chartRDept);
     fillChart(chartRDept,items);
     // Curules estimadas por depto (solo Cámara)
     const rpDcurWrap=document.getElementById('rp-dcur-wrap');
