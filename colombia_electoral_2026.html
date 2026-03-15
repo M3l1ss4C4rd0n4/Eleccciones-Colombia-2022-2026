@@ -210,6 +210,14 @@ body{
   #maps-area{grid-column:1/3;grid-row:2;grid-template-columns:1fr;}
   #panel-right{grid-column:2/3;grid-row:1;max-height:200px;}
 }
+/* ── Leyenda externa de candidatos (CN charts) ── */
+.cand-legend{display:flex;flex-direction:column;gap:2px;padding:5px 8px 4px;font-size:9.5px;color:var(--t1);max-height:140px;overflow-y:auto;}
+.cand-legend::-webkit-scrollbar{width:3px;}
+.cand-legend::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.cand-legend-item{display:flex;align-items:center;gap:5px;line-height:1.45;min-width:0;}
+.cand-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.cand-legend-num{color:var(--t3);min-width:18px;font-size:9px;flex-shrink:0;}
+.cand-legend-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -316,6 +324,7 @@ body{
       <div>
         <div class="sec-hdr" id="rp-nat-title">Nacional 2026</div>
         <div class="chart-box"><div class="cwrap"><canvas id="chart-R-nat"></canvas></div></div>
+        <div id="rp-nat-legend" class="cand-legend" style="display:none"></div>
       </div>
       <div id="rp-cur-section" style="display:none">
         <div class="sec-hdr" id="rp-cur-title">Curules 2026</div>
@@ -324,6 +333,7 @@ body{
       <div id="rp-dept-section" style="display:none">
         <div class="sec-hdr" id="rp-dept-title">Seleccione un departamento</div>
         <div class="chart-box"><div class="cwrap"><canvas id="chart-R-dept"></canvas></div></div>
+        <div id="rp-dept-legend" class="cand-legend" style="display:none"></div>
         <div id="rp-dcur-wrap" style="display:none">
           <div class="sec-hdr" id="rp-dcur-title">Curules estimadas dpto</div>
           <div class="chart-box"><div class="cwrap-sm"><canvas id="chart-R-dcur"></canvas></div></div>
@@ -756,6 +766,21 @@ function fillChart(chart,items){
   chart.update('none');
 }
 function clearChart(chart){ fillChart(chart,[]); }
+// Rellena un chart con etiquetas ordinales (1°, 2°...) y muestra leyenda externa
+function fillChartNumbered(chart,items,legendEl){
+  const top=items.slice(0,12);
+  chart._labels=top.map(i=>i.label);
+  chart.data.labels=top.map((_,i)=>`${i+1}\u00b0`);
+  chart.data.datasets[0].data=top.map(i=>i.value);
+  chart.data.datasets[0].backgroundColor=top.map(i=>i.color);
+  chart.update('none');
+  if(legendEl){
+    legendEl.innerHTML=top.map((item,i)=>
+      `<div class="cand-legend-item"><span class="cand-legend-dot" style="background:${item.color}"></span><span class="cand-legend-num">${i+1}\u00b0</span><span class="cand-legend-name">${item.label}</span></div>`
+    ).join('');
+    legendEl.style.display='';
+  }
+}
 
 // Convierte un chart existente en doughnut (para la vista CN presidencia)
 function switchToDoughnut(chart){
@@ -763,8 +788,17 @@ function switchToDoughnut(chart){
   chart.config.type='doughnut';
   chart.config.options.indexAxis=undefined;
   chart.config.options.scales={};
-  chart.config.options.plugins.legend={display:true,position:'right',labels:{color:'#7f9bc7',font:{size:9,family:'Inter'},boxWidth:12,padding:8}};
-  chart.config.options.plugins.tooltip.callbacks={label:ctx=>`${ctx.label}: ${fmt(ctx.raw)} votos (${((ctx.raw/ctx.dataset.data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)` };
+  chart.config.options.plugins.legend={display:false};
+  chart.config.options.plugins.tooltip.callbacks={
+    title:ctx=>{
+      const real=chart._labels?.[ctx[0].dataIndex];
+      return real||ctx[0].label;
+    },
+    label:ctx=>{
+      const total=ctx.dataset.data.reduce((a,b)=>a+b,0);
+      return ` ${fmt(ctx.raw)} votos (${((ctx.raw/total)*100).toFixed(1)}%)`;
+    }
+  };
   delete chart.config.data.datasets[0].borderRadius;
   delete chart.config.data.datasets[0].borderSkipped;
   chart.config.data.datasets[0].hoverOffset=10;
@@ -774,6 +808,11 @@ function switchToDoughnut(chart){
 // Convierte un chart doughnut de vuelta a barra horizontal
 function switchToBar(chart){
   if(chart.config.type==='bar'&&chart.config.options.indexAxis==='y') return;
+  // Ocultar leyendas externas si aplica
+  const _cid=chart.canvas?.id;
+  if(_cid==='chart-R-nat'){const l=document.getElementById('rp-nat-legend');if(l)l.style.display='none';}
+  if(_cid==='chart-R-dept'){const l=document.getElementById('rp-dept-legend');if(l)l.style.display='none';}
+  chart._labels=null;
   chart.config.type='bar';
   chart.config.options.indexAxis='y';
   chart.config.options.scales={
@@ -797,7 +836,13 @@ function switchToVBar(chart){
     y:{ticks:{color:'#4e6490',font:{size:9,family:'Inter'},callback:v=>fmtK(v)},grid:{color:'rgba(255,255,255,.04)'},border:{display:false}}
   };
   chart.config.options.plugins.legend={display:false};
-  chart.config.options.plugins.tooltip.callbacks={label:ctx=>' '+fmt(ctx.raw)+' votos'};
+  chart.config.options.plugins.tooltip.callbacks={
+    title:ctx=>{
+      const real=chart._labels?.[ctx[0].dataIndex];
+      return real||ctx[0].label;
+    },
+    label:ctx=>` ${fmt(ctx.raw)} votos`
+  };
   chart.config.data.datasets[0].borderRadius=5;
   chart.config.data.datasets[0].borderSkipped=false;
   delete chart.config.data.datasets[0].hoverOffset;
@@ -879,7 +924,7 @@ async function fetchAndShowCNDeptLive(dpto){
     items.sort((a,b)=>b.value-a.value);
     document.getElementById('rp-dept-title').textContent=`${dname} \u2014 Consulta 2026 en vivo`;
     switchToVBar(chartRDept);
-    fillChart(chartRDept,items.slice(0,12));
+    fillChartNumbered(chartRDept,items.slice(0,12),document.getElementById('rp-dept-legend'));
   } catch(e){
     document.getElementById('rp-dept-title').textContent=`${dname} \u2014 error: ${e.message}`;
   }
@@ -1001,7 +1046,7 @@ function renderPresidencia(orient){
   document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta presidencial 2026';
   const cnCands=getCNNationalCandidates();
   switchToDoughnut(chartRNat);
-  fillChart(chartRNat,cnCands.slice(0,12));
+  fillChartNumbered(chartRNat,cnCands.slice(0,12),document.getElementById('rp-nat-legend'));
   document.getElementById('rp-cur-section').style.display='none';
   document.getElementById('lp-dept-section').style.display='none';
   document.getElementById('rp-dept-section').style.display='none';
@@ -1066,7 +1111,7 @@ function renderConsultaPH(corp,orient){
     document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta presidencial 2026';
     const cnCands=getCNNationalCandidates();
     switchToDoughnut(chartRNat);
-    fillChart(chartRNat,cnCands.slice(0,12));
+    fillChartNumbered(chartRNat,cnCands.slice(0,12),document.getElementById('rp-nat-legend'));
     document.getElementById('rp-cur-section').style.display='none';
     document.getElementById('lp-dept-section').style.display='none';
     document.getElementById('rp-dept-section').style.display='none';
