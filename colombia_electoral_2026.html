@@ -538,27 +538,6 @@ const CN_CAND_COLORS={
 };
 function cnCandColor(cedula){ return CN_CAND_COLORS[String(cedula)]||'#94a3b8'; }
 
-// Orientación de cada candidato de la Consulta Interpartidista 2026 (por partido)
-const CN_CAND_ORIENT={
-  '25280205':'Derecha',      // Paloma Valencia (Centro Democrático)
-  '79941641':'Centro',       // Juan Daniel Oviedo
-  '79589617':'Centro',       // Juan Manuel Galán (Nuevo Liberalismo)
-  '79593847':'Derecha',      // Juan Carlos Pinzón (Conservador)
-  '66918051':'Centro',       // Victoria Dávila
-  '19333686':'Centro',       // Enrique Peñalosa (Liberal)
-  '70566243':'Centro',       // Aníbal Gaviria (Liberal)
-  '79777591':'Derecha',      // David Luna (Cambio Radical)
-  '79154695':'Centro',       // Mauricio Cárdenas (Liberal)
-  '51992648':'Centro',       // Claudia López (Alianza Verde)
-  '10004127':'Centro',       // Claudia Nayibe López
-  '79289575':'Izquierda',    // Roy Barreras (ex Pacto Histórico)
-  '71386360':'Izquierda',    // Daniel Quintero (Colombia Humana)
-  '8701424' :'Centro',       // Edison Torres
-  '1023871966':'Centro',     // Martha Bernal
-  '7475736' :'Centro',       // Héctor Pineda
-};
-function cnCandOrient(cedula){ return CN_CAND_ORIENT[String(cedula)]||'Centro'; }
-
 async function fetchCNDeptData(){
   const ambs=Object.entries(AMB_TO_DPTO).filter(([,v])=>v);
   const results=await Promise.allSettled(
@@ -594,7 +573,8 @@ function paintCNMapByCand(map,oldLayer,side,orient='todas'){
   for(const [dpto,d] of Object.entries(API_CN_DEPT_WINNERS)){
     const ru=d.runnerUp;
     if(!ru) continue;
-    const ruOrient=cnCandOrient(ru.cedula);
+    // Usa el codpar del partido del candidato → mismo catálogo PC que el resto de mapas
+    const ruOrient=getParty(ru.codpar).o||'Centro';
     if(orient!=='todas' && ruOrient!==orient) continue;
     const totalVots=d.all.reduce((s,c)=>s+c.vot,0);
     const w1=d.winner;
@@ -1121,7 +1101,8 @@ function renderConsultaPH(corp,orient){
     // Izquierda: Consulta PH 2025 Presidencia | Derecha: Consulta Interpartidista 2026 EN VIVO
     document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
-    layerL=paintPHMap(mapL,layerL,ph,'left',orient);
+    // Mapa izquierdo PH Consulta Presidencia: siempre mostrar todos (son todos Izquierda)
+    layerL=paintPHMap(mapL,layerL,ph,'left','todas');
     layerR=paintCNMapByCand(mapR,layerR,'right',orient);
 
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
@@ -1150,7 +1131,8 @@ function renderConsultaPH(corp,orient){
   document.getElementById('left-title').textContent=`PH Consulta 2025 — ${phLbl}`;
   document.getElementById('right-title').textContent=`Congreso 2026 EN VIVO — ${phLabels[liveCorp]||liveCorp}`;
 
-  layerL=paintPHMap(mapL,layerL,ph,'left',orient);
+  // Mapa izquierdo PH Consulta Senado/Cámara: siempre mostrar todos (son todos Izquierda/PH)
+  layerL=paintPHMap(mapL,layerL,ph,'left','todas');
   layerR=paintLiveMap(mapR,layerR,liveCorp==='senado'?API_SE:API_CA,orient,'right');
 
   document.getElementById('lp-title').textContent=`PH Consulta 2025 — ${phLbl}`;
