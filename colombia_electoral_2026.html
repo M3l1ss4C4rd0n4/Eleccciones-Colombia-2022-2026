@@ -543,14 +543,15 @@ async function fetchCNDeptData(){
     if(r.status!=='fulfilled'||!r.value) continue;
     const cam=r.value.camaras?.[0];
     if(!cam) continue;
-    let best=null,bestVot=-1;
+    const all=[];
     for(const p of (cam.partotabla||[])){
       for(const c of (p.act.cantotabla||[])){
         const vot=parseInt(c.vot||0);
-        if(vot>bestVot){bestVot=vot;best={name:`${c.nomcan} ${c.apecan}`.trim(),vot,pct:parseFloat((c.pvot||'0').replace(',','.').replace('%','')),cedula:c.cedula,codpar:p.act.codpar};}
+        if(vot>0) all.push({name:`${c.nomcan} ${c.apecan}`.trim(),vot,pct:parseFloat((c.pvot||'0').replace(',','.').replace('%','')),cedula:c.cedula,codpar:p.act.codpar});
       }
     }
-    if(best) byDpto[dpto]=best;
+    all.sort((a,b)=>b.vot-a.vot);
+    if(all.length>0) byDpto[dpto]={winner:all[0],runnerUp:all[1]||null,all};
   }
   API_CN_DEPT_WINNERS=byDpto;
   return byDpto;
@@ -560,9 +561,21 @@ function paintCNMapByCand(map,oldLayer,side){
   if(oldLayer) map.removeLayer(oldLayer);
   removeLegend(map,side);
   if(!GEO||!API_CN_DEPT_WINNERS) return null;
+  // Colorear por 2° candidato (runner-up) ya que Paloma ganó los 33 deptos
   const winners={};
-  for(const [dpto,w] of Object.entries(API_CN_DEPT_WINNERS)){
-    winners[dpto]={name:w.name,color:cnCandColor(w.cedula),pct:w.pct,vot:w.vot};
+  for(const [dpto,d] of Object.entries(API_CN_DEPT_WINNERS)){
+    const ru=d.runnerUp;
+    if(!ru) continue;
+    const totalVots=d.all.reduce((s,c)=>s+c.vot,0);
+    const w1=d.winner;
+    // Tooltip muestra 1º y 2º; color y nombre del 2º
+    winners[dpto]={
+      name:`2° ${ru.name}`,
+      color:cnCandColor(ru.cedula),
+      pct:ru.pct,
+      vot:ru.vot,
+      extra:`1° ${w1.name} ${w1.pct.toFixed(1)}%`
+    };
   }
   const maxPct=Math.max(...Object.values(winners).map(w=>w.pct),1);
   const layer=L.geoJSON(GEO,{
@@ -570,7 +583,7 @@ function paintCNMapByCand(map,oldLayer,side){
     onEachFeature:(f,fl)=>deptEvents(fl,pad2(f.properties.DPTO),winners,side,maxPct)
   });
   layer.addTo(map);
-  addLegend(map,side,buildWinLegend(winners));
+  addLegend(map,side,buildWinLegend(winners,true));
   return layer;
 }
 let chartNat=null, chartDept=null; // legacy (no longer used, kept for safety)
@@ -586,10 +599,11 @@ function makeTT(dpto, w) {
   if (!w) return `<div class="dn">${name}</div><div class="dp" style="opacity:.5">Sin datos disponibles</div>`;
   const col = w.color || '#4e6490';
   const votStr = (w.vot && w.vot > 0) ? `<div class="dv">${fmt(w.vot)} votos</div>` : '';
+  const extraStr = w.extra ? `<div class="dp" style="opacity:.65;font-size:12px;margin-top:2px">${w.extra}</div>` : '';
   return `<div class="dn">${name}</div>` +
     `<div class="dp"><div class="dpdc" style="background:${col}"></div>${w.name}</div>` +
     `<div class="dpct" style="color:${col}">${w.pct.toFixed(1)}<span style="font-size:15px;font-weight:600">%</span></div>` +
-    votStr;
+    votStr + extraStr;
 }
 
 // ═══════════════════════════════════════════════════
@@ -916,9 +930,7 @@ function getCNNationalCandidates(){
 function renderPresidencia(orient){
   const v1=HIST.presidencial['2022'].vuelta1;
   document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
-  document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — Presidencia EN VIVO';
-
-  layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
+  document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
   layerR=paintCNMapByCand(mapR,layerR,'right');
 
   document.getElementById('lp-title').textContent='Presidencial 2022';
@@ -981,8 +993,7 @@ function renderConsultaPH(corp,orient){
   if(phType==='presidente'){
     // Izquierda: Consulta PH 2025 Presidencia | Derecha: Consulta Interpartidista 2026 EN VIVO
     document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
-    document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — Presidencia EN VIVO';
-    layerL=paintPHMap(mapL,layerL,ph,'left');
+    document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — 2° candidato por depto';
     layerR=paintCNMapByCand(mapR,layerR,'right');
 
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
