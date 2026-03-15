@@ -431,6 +431,10 @@ const PC = {
   '152':{n:'Mov. Santander',c:'#e879f9',o:'Centro'},
   '153':{n:'Mov. Regional',c:'#fbbf24',o:'Centro'},
   '170':{n:'Coalición Sindical',c:'#f59e0b',o:'Centroizquierda'},
+  // Consultas interpartidistas presidenciales 2026
+  '30':{n:'Consulta Claudia López',c:'#ec4899',o:'Centroizquierda'},
+  '31':{n:'La Gran Consulta',c:'#f59e0b',o:'Centroderecha'},
+  '32':{n:'Consulta Pacto Histórico',c:'#dc2626',o:'Izquierda'},
 };
 // Para partidos sin nombre conocido, genera un color único y determinista
 // basado en el número de codpar — paleta de 24 colores vividos
@@ -502,7 +506,7 @@ function dynOpacity(pct, maxPct) {
 // ═══════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════
-let GEO=null, HIST=null, API_CA=null, API_SE=null;
+let GEO=null, HIST=null, API_CA=null, API_SE=null, API_CN=null;
 let mapL=null, mapR=null, layerL=null, layerR=null;
 let chartNat=null, chartDept=null; // legacy (no longer used, kept for safety)
 let chartLNat=null, chartLCur=null, chartLDept=null, chartLDcur=null;
@@ -601,13 +605,15 @@ async function fetchLiveData() {
   setStatus('Actualizando\u2026','#4f8ef7');
   show('right-spinner',true);
   try {
-    const [rCA, rSE] = await Promise.allSettled([
+    const [rCA, rSE, rCN] = await Promise.allSettled([
       fetch('/api/registraduria_proxy.py?path=ACT/CA/00'),
-      fetch('/api/registraduria_proxy.py?path=ACT/SE/00')
+      fetch('/api/registraduria_proxy.py?path=ACT/SE/00'),
+      fetch('/api/registraduria_proxy.py?path=ACT/CN/00')
     ]);
     let ok = false;
     if(rCA.status==='fulfilled'&&rCA.value.ok){ API_CA=await rCA.value.json(); ok=true; }
     if(rSE.status==='fulfilled'&&rSE.value.ok){ API_SE=await rSE.value.json(); ok=true; }
+    if(rCN.status==='fulfilled'&&rCN.value.ok){ API_CN=await rCN.value.json(); ok=true; }
     if(!ok) throw Error('Sin datos');
     const d=API_CA||API_SE;
     document.getElementById('update-time').textContent=d?.mdhm?'Act: '+d.mdhm:'';
@@ -712,17 +718,41 @@ function render(){
 
 // Muestra en panel derecho los votos de la Consulta PH 2025 Presidencia para un depto
 // (usado en página 1 con opción Presidencia)
-function showPresidenciaRightDept(dpto){
-  const ph=HIST.consultas['2025'].presidente;
-  const histKey=DPTO_TO_HIST[dpto]||dpto;
+async function fetchAndShowCNDeptLive(dpto){
+  const amb=DPTO_TO_AMB[dpto];
   const dname=DPTO_TO_NAME[dpto]||dpto;
-  const arr=(ph.departamentos||{})[histKey]||[];
   document.getElementById('rp-dept-section').style.display='';
-  document.getElementById('rp-dept-title').textContent=`${dname} \u2014 Consulta PH 2025 Presidencia`;
   document.getElementById('rp-dcur-wrap').style.display='none';
-  resetPhColors();
-  fillChart(chartRDept,arr.sort((a,b)=>b.votos-a.votos)
-    .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)})));
+  if(!amb){
+    document.getElementById('rp-dept-title').textContent=`${dname} \u2014 sin datos`;
+    clearChart(chartRDept); return;
+  }
+  document.getElementById('rp-dept-title').textContent=`${dname} \u2014 cargando\u2026`;
+  try{
+    const r=await fetch(`/api/registraduria_proxy.py?path=ACT/CN/${amb}`);
+    if(!r.ok) throw Error(r.status);
+    const data=await r.json();
+    const cam=data.camaras?.[0];
+    if(!cam?.partotabla?.length) throw Error('no data');
+    const items=[];
+    for(const p of cam.partotabla){
+      const consulta=getParty(p.act.codpar);
+      for(const c of (p.act.cantotabla||[])){
+        const vot=parseInt(c.vot||0);
+        if(vot>0) items.push({label:`${c.nomcan} ${c.apecan}`.trim(),value:vot,color:consulta.c});
+      }
+    }
+    items.sort((a,b)=>b.value-a.value);
+    document.getElementById('rp-dept-title').textContent=`${dname} \u2014 Consulta 2026 en vivo`;
+    fillChart(chartRDept,items.slice(0,12));
+  } catch(e){
+    document.getElementById('rp-dept-title').textContent=`${dname} \u2014 error: ${e.message}`;
+  }
+}
+
+function showPresidenciaRightDept(dpto){
+  // Ahora usa datos en vivo de la consulta interpartidista 2026
+  fetchAndShowCNDeptLive(dpto);
 }
 
 function showPresidencialV1Dept(dpto){
@@ -799,15 +829,30 @@ function renderCongreso(corp,orient){
   selectedDept=null;
 }
 
-// Presidencia en página 1: izquierda=Presidencial 2022 V1, derecha=Consulta PH 2025 Presidencia
+// Helper: extrae candidatos de API_CN ordenados por votos para panel nacional
+function getCNNationalCandidates(){
+  if(!API_CN) return [];
+  const cam=API_CN.camaras?.[0];
+  if(!cam) return [];
+  const all=[];
+  for(const p of (cam.partotabla||[])){
+    const consulta=getParty(p.act.codpar);
+    for(const c of (p.act.cantotabla||[])){
+      const vot=parseInt(c.vot||0);
+      if(vot>0) all.push({label:`${c.nomcan} ${c.apecan}`.trim(),value:vot,color:consulta.c});
+    }
+  }
+  return all.sort((a,b)=>b.value-a.value);
+}
+
+// Presidencia en página 1: izquierda=Presidencial 2022 V1, derecha=Consulta Interpartidista 2026 en vivo
 function renderPresidencia(orient){
   const v1=HIST.presidencial['2022'].vuelta1;
-  const ph=HIST.consultas['2025'].presidente;
   document.getElementById('left-title').textContent='Presidencial 2022 — 1ª Vuelta';
-  document.getElementById('right-title').textContent='Consulta PH 2025 — Presidencia';
+  document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — Presidencia EN VIVO';
 
   layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
-  layerR=paintPHMap(mapR,layerR,ph,'right');
+  layerR=paintLiveMap(mapR,layerR,API_CN,'todas','right');
 
   document.getElementById('lp-title').textContent='Presidencial 2022';
   document.getElementById('lp-nat-title').textContent='Votos nacionales — 1ª Vuelta 2022';
@@ -817,12 +862,10 @@ function renderPresidencia(orient){
   fillChart(chartLNat,nat1);
   document.getElementById('lp-cur-section').style.display='none';
 
-  document.getElementById('rp-title').textContent='Consulta PH 2025 — Presidencia';
-  document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
-  resetPhColors();
-  const cands=(ph.candidatos||[]).slice().sort((a,b)=>b.votos-a.votos)
-    .map(c=>({label:c.candidato||c.partido,value:c.votos,color:phCandidateColor(c.candidato||c.partido)}));
-  fillChart(chartRNat,cands);
+  document.getElementById('rp-title').textContent='Consulta Interpartidista 2026';
+  document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta presidencial 2026';
+  const cnCands=getCNNationalCandidates();
+  fillChart(chartRNat,cnCands.slice(0,12));
   document.getElementById('rp-cur-section').style.display='none';
   document.getElementById('lp-dept-section').style.display='none';
   document.getElementById('rp-dept-section').style.display='none';
@@ -869,12 +912,11 @@ function renderConsultaPH(corp,orient){
   const phLbl = phLabels[phType]||phType;
 
   if(phType==='presidente'){
-    // Izquierda: Consulta PH 2025 Presidencia | Derecha: Presidencial 2022 V1
-    const v1=HIST.presidencial['2022'].vuelta1;
+    // Izquierda: Consulta PH 2025 Presidencia | Derecha: Consulta Interpartidista 2026 EN VIVO
     document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
-    document.getElementById('right-title').textContent='Presidencial 2022 — 1ª Vuelta';
+    document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — Presidencia EN VIVO';
     layerL=paintPHMap(mapL,layerL,ph,'left');
-    layerR=paintHistMap(mapR,layerR,v1.departamentos,orient,'right',true);
+    layerR=paintLiveMap(mapR,layerR,API_CN,'todas','right');
 
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('lp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
@@ -884,12 +926,10 @@ function renderConsultaPH(corp,orient){
     fillChart(chartLNat,cPH);
     document.getElementById('lp-cur-section').style.display='none';
 
-    document.getElementById('rp-title').textContent='Presidencial 2022 — 1ª Vuelta';
-    document.getElementById('rp-nat-title').textContent='Votos nacionales — 1ª Vuelta 2022';
-    const nat1=filterOrient(v1.nacional,orient,'orientacion')
-      .sort((a,b)=>b.votos-a.votos)
-      .map(p=>({label:p.candidato||p.partido,value:p.votos,color:bestColor(p.candidato||p.partido,p.color)}));
-    fillChart(chartRNat,nat1);
+    document.getElementById('rp-title').textContent='Consulta Interpartidista 2026';
+    document.getElementById('rp-nat-title').textContent='Votos nacionales — Consulta presidencial 2026';
+    const cnCands=getCNNationalCandidates();
+    fillChart(chartRNat,cnCands.slice(0,12));
     document.getElementById('rp-cur-section').style.display='none';
     document.getElementById('lp-dept-section').style.display='none';
     document.getElementById('rp-dept-section').style.display='none';
@@ -1059,7 +1099,7 @@ function deptEvents(fl,dpto,winners,side,maxPct){
       }
       else if(currentTab==='presidencial') showPresidencialV2Dept(dpto);
       else if(currentTab==='consulta_ph'){
-        if(phType==='presidente') showPresidencialV1Dept(dpto);
+        if(phType==='presidente') fetchAndShowCNDeptLive(dpto);
         else fetchAndShowDeptLive(dpto);
       }
     }
