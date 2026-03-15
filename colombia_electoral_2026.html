@@ -507,7 +507,72 @@ function dynOpacity(pct, maxPct) {
 // STATE
 // ═══════════════════════════════════════════════════
 let GEO=null, HIST=null, API_CA=null, API_SE=null, API_CN=null;
+let API_CN_DEPT_WINNERS=null; // candidato ganador por depto de la consulta CN
 let mapL=null, mapR=null, layerL=null, layerR=null;
+
+// Paleta de colores fijos por cédula de candidato consulta 2026
+const CN_CAND_COLORS={
+  '25280205':'#f59e0b',  // Paloma Valencia
+  '79941641':'#fb923c',  // Juan Daniel Oviedo
+  '79589617':'#fde047',  // Juan Manuel Galán
+  '79593847':'#a3e635',  // Juan Carlos Pinzón
+  '66918051':'#34d399',  // Victoria Dávila
+  '19333686':'#22d3ee',  // Peñalosa
+  '70566243':'#818cf8',  // Aníbal Gaviria
+  '79777591':'#c084fc',  // David Luna
+  '79154695':'#6366f1',  // Mauricio Cárdenas
+  '51992648':'#ec4899',  // Claudia López
+  '10004127':'#f472b6',  // Leonardo Huerta
+  '79289575':'#dc2626',  // Roy Barreras
+  '71386360':'#ef4444',  // Daniel Quintero
+  '8701424' :'#f87171',  // Edison Torres
+  '1023871966':'#fca5a5',// Martha Bernal
+  '7475736' :'#fecaca',  // Héctor Pineda
+};
+function cnCandColor(cedula){ return CN_CAND_COLORS[String(cedula)]||'#94a3b8'; }
+
+async function fetchCNDeptData(){
+  const ambs=Object.entries(AMB_TO_DPTO).filter(([,v])=>v);
+  const results=await Promise.allSettled(
+    ambs.map(([amb])=>fetch(`/api/registraduria_proxy.py?path=ACT/CN/${amb}`).then(r=>r.ok?r.json():null).catch(()=>null))
+  );
+  const byDpto={};
+  for(let i=0;i<ambs.length;i++){
+    const [amb,dpto]=ambs[i];
+    const r=results[i];
+    if(r.status!=='fulfilled'||!r.value) continue;
+    const cam=r.value.camaras?.[0];
+    if(!cam) continue;
+    let best=null,bestVot=-1;
+    for(const p of (cam.partotabla||[])){
+      for(const c of (p.act.cantotabla||[])){
+        const vot=parseInt(c.vot||0);
+        if(vot>bestVot){bestVot=vot;best={name:`${c.nomcan} ${c.apecan}`.trim(),vot,pct:parseFloat((c.pvot||'0').replace(',','.').replace('%','')),cedula:c.cedula,codpar:p.act.codpar};}
+      }
+    }
+    if(best) byDpto[dpto]=best;
+  }
+  API_CN_DEPT_WINNERS=byDpto;
+  return byDpto;
+}
+
+function paintCNMapByCand(map,oldLayer,side){
+  if(oldLayer) map.removeLayer(oldLayer);
+  removeLegend(map,side);
+  if(!GEO||!API_CN_DEPT_WINNERS) return null;
+  const winners={};
+  for(const [dpto,w] of Object.entries(API_CN_DEPT_WINNERS)){
+    winners[dpto]={name:w.name,color:cnCandColor(w.cedula),pct:w.pct,vot:w.vot};
+  }
+  const maxPct=Math.max(...Object.values(winners).map(w=>w.pct),1);
+  const layer=L.geoJSON(GEO,{
+    style:f=>deptStyle(pad2(f.properties.DPTO),winners,maxPct),
+    onEachFeature:(f,fl)=>deptEvents(fl,pad2(f.properties.DPTO),winners,side,maxPct)
+  });
+  layer.addTo(map);
+  addLegend(map,side,buildWinLegend(winners));
+  return layer;
+}
 let chartNat=null, chartDept=null; // legacy (no longer used, kept for safety)
 let chartLNat=null, chartLCur=null, chartLDept=null, chartLDcur=null;
 let chartRNat=null, chartRCur=null, chartRDept=null, chartRDcur=null;
@@ -546,6 +611,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   render();
   fetchLiveData();
   setInterval(() => fetchLiveData(), 60000);
+  // Cargar datos por candidato por dept de la consulta CN (una sola vez)
+  fetchCNDeptData().then(()=>{ if(GEO&&HIST) render(); });
 });
 
 document.querySelectorAll('#nav button').forEach(btn => {
@@ -852,7 +919,7 @@ function renderPresidencia(orient){
   document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — Presidencia EN VIVO';
 
   layerL=paintHistMap(mapL,layerL,v1.departamentos,orient,'left',true);
-  layerR=paintLiveMap(mapR,layerR,API_CN,'todas','right');
+  layerR=paintCNMapByCand(mapR,layerR,'right');
 
   document.getElementById('lp-title').textContent='Presidencial 2022';
   document.getElementById('lp-nat-title').textContent='Votos nacionales — 1ª Vuelta 2022';
@@ -916,7 +983,7 @@ function renderConsultaPH(corp,orient){
     document.getElementById('left-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('right-title').textContent='Consulta Interpartidista 2026 — Presidencia EN VIVO';
     layerL=paintPHMap(mapL,layerL,ph,'left');
-    layerR=paintLiveMap(mapR,layerR,API_CN,'todas','right');
+    layerR=paintCNMapByCand(mapR,layerR,'right');
 
     document.getElementById('lp-title').textContent='PH Consulta 2025 — Presidencia';
     document.getElementById('lp-nat-title').textContent='Votos nacionales — Consulta 2025 (Presidencia)';
