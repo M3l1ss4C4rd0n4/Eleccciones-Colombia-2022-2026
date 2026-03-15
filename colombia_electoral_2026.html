@@ -871,14 +871,14 @@ async function fetchAndShowCNDeptLive(dpto){
     if(!cam?.partotabla?.length) throw Error('no data');
     const items=[];
     for(const p of cam.partotabla){
-      const consulta=getParty(p.act.codpar);
       for(const c of (p.act.cantotabla||[])){
         const vot=parseInt(c.vot||0);
-        if(vot>0) items.push({label:`${c.nomcan} ${c.apecan}`.trim(),value:vot,color:consulta.c});
+        if(vot>0) items.push({label:`${c.nomcan} ${c.apecan}`.trim(),value:vot,color:cnCandColor(c.cedula)});
       }
     }
     items.sort((a,b)=>b.value-a.value);
     document.getElementById('rp-dept-title').textContent=`${dname} \u2014 Consulta 2026 en vivo`;
+    switchToVBar(chartRDept);
     fillChart(chartRDept,items.slice(0,12));
   } catch(e){
     document.getElementById('rp-dept-title').textContent=`${dname} \u2014 error: ${e.message}`;
