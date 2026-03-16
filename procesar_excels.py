@@ -432,6 +432,78 @@ for _, row in df_cur.iterrows():
 print(f"  → Senado curules: {len(sen22_curules_nac)} partidos = {sum(x['curules'] for x in sen22_curules_nac)} escaños")
 print(f"  → Cámara curules: {len(cam22_curules_dep)} departamentos = {sum(sum(p['curules'] for p in v) for v in cam22_curules_dep.values())} escaños (territoriales)")
 
+# ── Curules OFICIALES 2026 (calculadas a mano, curules_2026.xlsx) ─────────────
+print("\n[4c/5] Leyendo curules oficiales 2026 (curules_2026.xlsx) …")
+df_cur26 = pd.read_excel("curules_2026.xlsx", sheet_name=0, header=None)
+
+# Normalize department name helper
+def norm_dpto(s):
+    return (s.lower()
+            .replace('á','a').replace('é','e').replace('í','i')
+            .replace('ó','o').replace('ú','u').replace('ñ','n')
+            .replace('.','').strip())
+
+NORM_DPTO_TO_DANE = {norm_dpto(k): v for k, v in EXCEL_DPTO_TO_DANE.items()}
+
+# Senado 2026 nacional: col1=partido, col2=curules (antes de la sección CAMARA)
+sen26_curules_nac = []
+for _, row in df_cur26.iloc[1:].iterrows():
+    p = str(row[1]).strip() if pd.notna(row[1]) else ""
+    c = row[2]
+    if not p or p.upper() in ('CAMARA', 'DEPARTAMENTO', 'NAN', ''):
+        break
+    if pd.notna(c):
+        try:
+            pnorm = normalizar_partido(p) or p
+            col = COLOR_MAP.get(pnorm, "#64748b")
+            sen26_curules_nac.append({"partido": pnorm, "curules": int(c), "color": col})
+        except (ValueError, TypeError):
+            pass
+
+# Cámara 2026 por departamento: col1=dpto, col2=partido, col3=curules
+cam26_curules_dep = {}   # {dane_code: [{partido, curules, color}]}
+cur_dpto26 = None
+cam_seccion = False
+for _, row in df_cur26.iterrows():
+    col0 = str(row[1]).strip() if pd.notna(row[1]) else ""
+    col1 = str(row[2]).strip() if pd.notna(row[2]) else ""
+    col2 = row[3]
+    if col0.upper() == 'CAMARA':
+        cam_seccion = True
+        continue
+    if not cam_seccion:
+        continue
+    if col0.upper() in ('DEPARTAMENTO', 'SENADO', 'NAN', ''):
+        continue
+    if col0 and col1 and pd.notna(col2):
+        cur_dpto26 = col0
+        nd = norm_dpto(col0)
+        dane = NORM_DPTO_TO_DANE.get(nd)
+        if not dane:
+            continue
+        pnorm = normalizar_partido(col1) or col1.strip()
+        col = COLOR_MAP.get(pnorm, "#64748b")
+        if dane not in cam26_curules_dep:
+            cam26_curules_dep[dane] = []
+        try:
+            cam26_curules_dep[dane].append({"partido": pnorm, "curules": int(col2), "color": col})
+        except (ValueError, TypeError):
+            pass
+    elif not col0 and col1 and pd.notna(col2) and cur_dpto26:
+        nd = norm_dpto(cur_dpto26)
+        dane = NORM_DPTO_TO_DANE.get(nd)
+        if not dane:
+            continue
+        pnorm = normalizar_partido(col1) or col1.strip()
+        col = COLOR_MAP.get(pnorm, "#64748b")
+        try:
+            cam26_curules_dep[dane].append({"partido": pnorm, "curules": int(col2), "color": col})
+        except (ValueError, TypeError):
+            pass
+
+print(f"  → Senado 2026 curules: {len(sen26_curules_nac)} partidos = {sum(x['curules'] for x in sen26_curules_nac)} escaños")
+print(f"  → Cámara 2026 curules: {len(cam26_curules_dep)} departamentos = {sum(sum(p['curules'] for p in v) for v in cam26_curules_dep.values())} escaños")
+
 # ── 5/5 PRESIDENCIALES 2022 ──────────────────────────────────────────────────
 print("\n[5/5] Leyendo Presidenciales 2022 …")
 df_p22 = pd.read_excel("Presidencia 2022.xlsx", sheet_name="Resultados")
@@ -508,7 +580,14 @@ historico = {
         },
         # El Congreso 2026 general no está disponible en los Excel;
         # se consigue en tiempo real vía /api/registraduria_proxy
-        "2026": None,
+        "2026": {
+            "camara": {
+                "curules_dep": cam26_curules_dep,   # oficiales 2026 por c\u00f3digo DANE
+            },
+            "senado": {
+                "curules_nac": sen26_curules_nac,   # oficiales 2026 nacionales
+            },
+        },
     },
     # Presidenciales 2022
     "presidencial": {

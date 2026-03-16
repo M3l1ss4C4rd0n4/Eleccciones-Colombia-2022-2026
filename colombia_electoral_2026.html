@@ -1040,16 +1040,12 @@ function renderCongreso(corp,orient){
   document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${lbl}`;
   fillLiveNatChart(corp,orient);
 
-  // Curules estimadas 2026 — solo Senado (D'Hondt nacional es válido);
-  // para Cámara se omite: la Cámara se elige por departamento, no con D'Hondt nacional
-  if(corp==='senado'){
-    const seats2026=computeEstimatedCurules(API_SE,100,0.03,orient);
-    const rpCurVisible=seats2026.length>0;
-    document.getElementById('rp-cur-section').style.display=rpCurVisible?'':'none';
-    if(rpCurVisible){
-      document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — Senado (proyección D'Hondt)`;
-      fillCurChart(chartRCur,seats2026);
-    }
+  // Curules 2026 oficiales (Senado: curules_nac; Cámara: suma de curules_dep)
+  const curulesNac2026=getCurules2026Nacional(corp);
+  if(curulesNac2026.length>0){
+    document.getElementById('rp-cur-section').style.display='';
+    document.getElementById('rp-cur-title').textContent=`Curules 2026 — ${lbl} (resultado oficial)`;
+    fillCurChart(chartRCur,curulesNac2026);
   } else {
     document.getElementById('rp-cur-section').style.display='none';
   }
@@ -1208,16 +1204,12 @@ function renderConsultaPH(corp,orient){
   document.getElementById('rp-nat-title').textContent=`Votos nacionales 2026 — ${phLabels[liveCorp]}`;
   fillLiveNatChart(liveCorp,orient);
 
-  // Curules estimadas 2026 — solo Senado (D'Hondt nacional es válido);
-  // para Cámara se omite: la Cámara se elige por departamento, no con D'Hondt nacional
-  if(liveCorp==='senado'){
-    const seatsPH=computeEstimatedCurules(API_SE,100,0.03,orient);
-    const rpCurPHVisible=seatsPH.length>0;
-    document.getElementById('rp-cur-section').style.display=rpCurPHVisible?'':'none';
-    if(rpCurPHVisible){
-      document.getElementById('rp-cur-title').textContent=`Curules estimadas 2026 — Senado (proyección D'Hondt)`;
-      fillCurChart(chartRCur,seatsPH);
-    }
+  // Curules 2026 oficiales (Senado: curules_nac; Cámara: suma de curules_dep)
+  const curulesNac2026PH=getCurules2026Nacional(liveCorp);
+  if(curulesNac2026PH.length>0){
+    document.getElementById('rp-cur-section').style.display='';
+    document.getElementById('rp-cur-title').textContent=`Curules 2026 — ${phLabels[liveCorp]||liveCorp} (resultado oficial)`;
+    fillCurChart(chartRCur,curulesNac2026PH);
   } else {
     document.getElementById('rp-cur-section').style.display='none';
   }
@@ -1515,18 +1507,14 @@ async function fetchAndShowDeptLive(dpto){
     document.getElementById('rp-dept-title').textContent=`${dname} — 2026 en vivo`;
     switchToBar(chartRDept);
     fillChart(chartRDept,items);
-    // Curules estimadas por depto (solo Cámara)
+    // Curules 2026 oficiales por departamento (Cámara únicamente)
     const rpDcurWrap=document.getElementById('rp-dcur-wrap');
     if(corp!=='senado'){
-      // Use API seat count if available; fall back to the official fixed allocation
-      const totalDptoSeats=parseInt(cam.cargtota||0)||parseInt(cam.carg||0)||CAMARA_SEATS_BY_DPTO[dpto]||0;
-      if(totalDptoSeats>0){
-        const dcur=computeEstimatedCurules({camaras:[cam]},totalDptoSeats,0,'todas');
-        if(dcur.length){
-          rpDcurWrap.style.display='';
-          document.getElementById('rp-dcur-title').textContent=`Curules estimadas 2026 — ${dname} (${totalDptoSeats} escaños)`;
-          fillCurChart(chartRDcur,dcur);
-        } else { rpDcurWrap.style.display='none'; }
+      const dcur26=getCurules2026CamaraDept(dpto);
+      if(dcur26.length){
+        rpDcurWrap.style.display='';
+        document.getElementById('rp-dcur-title').textContent=`Curules Cámara 2026 — ${dname} (resultado oficial)`;
+        fillCurChart(chartRDcur,dcur26);
       } else { rpDcurWrap.style.display='none'; }
     } else { document.getElementById('rp-dcur-wrap').style.display='none'; }
 
@@ -1645,6 +1633,39 @@ function getCurulesCamaraDept(dpto){
   // dpto es código DANE de 2 dígitos (ej: '05')
   if(!HIST) return [];
   const arr = HIST.congreso?.['2022']?.camara?.curules_dep?.[dpto] || [];
+  return arr
+    .sort((a,b)=>b.curules-a.curules)
+    .map(p=>({label:p.partido, value:p.curules, color:bestColor(p.partido,p.color)||'#64748b'}));
+}
+
+// Retorna curules 2026 nacionales (Senado o Cámara) desde datos oficiales del Excel 2026
+function getCurules2026Nacional(corp){
+  if(!HIST) return [];
+  if(corp==='senado'){
+    const cur = HIST.congreso?.['2026']?.senado?.curules_nac || [];
+    return cur
+      .sort((a,b)=>b.curules-a.curules)
+      .map(p=>({label:p.partido, value:p.curules, color:bestColor(p.partido,p.color)||'#64748b'}));
+  } else {
+    // Cámara: agregar curules oficiales por departamento -> total nacional
+    const depData = HIST.congreso?.['2026']?.camara?.curules_dep || {};
+    const sums = {};
+    for(const arr of Object.values(depData)){
+      for(const p of arr){
+        if(!sums[p.partido]) sums[p.partido]={total:0,color:p.color};
+        sums[p.partido].total += p.curules;
+      }
+    }
+    return Object.entries(sums)
+      .sort((a,b)=>b[1].total-a[1].total)
+      .map(([partido,d])=>({label:partido, value:d.total, color:bestColor(partido,d.color)||'#64748b'}));
+  }
+}
+
+// Retorna curules Cámara 2026 para un departamento desde datos oficiales del Excel 2026
+function getCurules2026CamaraDept(dpto){
+  if(!HIST) return [];
+  const arr = HIST.congreso?.['2026']?.camara?.curules_dep?.[dpto] || [];
   return arr
     .sort((a,b)=>b.curules-a.curules)
     .map(p=>({label:p.partido, value:p.curules, color:bestColor(p.partido,p.color)||'#64748b'}));
