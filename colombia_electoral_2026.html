@@ -539,6 +539,7 @@ function dynOpacity(pct, maxPct) {
 // ═══════════════════════════════════════════════════
 let GEO=null, HIST=null, API_CA=null, API_SE=null, API_CN=null;
 let API_CN_DEPT_WINNERS=null; // candidato ganador por depto de la consulta CN
+let API_CA_DEPT_CANDS=null;  // top candidatos Cámara 2026 agregados por depto
 let mapL=null, mapR=null, layerL=null, layerR=null;
 
 // Paleta de colores fijos por cédula de candidato consulta 2026
@@ -586,6 +587,35 @@ async function fetchCNDeptData(){
   }
   API_CN_DEPT_WINNERS=byDpto;
   return byDpto;
+}
+
+async function fetchCACandidatosNacional(){
+  const ambs=Object.entries(AMB_TO_DPTO).filter(([,v])=>v);
+  const results=await Promise.allSettled(
+    ambs.map(([amb])=>fetch(`/api/registraduria_proxy.py?path=ACT/CA/${amb}`).then(r=>r.ok?r.json():null).catch(()=>null))
+  );
+  const agg={};
+  for(let i=0;i<ambs.length;i++){
+    const r=results[i];
+    if(r.status!=='fulfilled'||!r.value) continue;
+    const cam=r.value.camaras?.[0];
+    if(!cam?.partotabla) continue;
+    for(const p of cam.partotabla){
+      const party=getParty(p.act.codpar);
+      for(const c of (p.act.cantotabla||[])){
+        const vot=parseInt(c.vot||0);
+        const name=`${c.nomcan||''} ${c.apecan||''}`.trim();
+        const esSoloLista=!name||/solo\s+por|por\s+la\s+lista/i.test(name);
+        if(vot>0&&!esSoloLista){
+          const key=c.cedula||name;
+          if(!agg[key]) agg[key]={label:name,value:0,color:party.c};
+          agg[key].value+=vot;
+        }
+      }
+    }
+  }
+  API_CA_DEPT_CANDS=Object.values(agg).sort((a,b)=>b.value-a.value);
+  return API_CA_DEPT_CANDS;
 }
 
 function paintCNMapByCand(map,oldLayer,side,orient='todas'){
@@ -665,6 +695,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   setInterval(() => fetchLiveData(), 60000);
   // Cargar datos por candidato por dept de la consulta CN (una sola vez)
   fetchCNDeptData().then(()=>{ if(GEO&&HIST) render(); });
+  // Cargar candidatos Cámara 2026 por dept para agregar top 10 nacional
+  fetchCACandidatosNacional().then(()=>{ if(GEO&&HIST) render(); });
 });
 
 document.querySelectorAll('#nav button').forEach(btn => {
@@ -1695,7 +1727,14 @@ function getTop10NationalCandidates2022(corp){
 // Para Senado (circunscripción nacional) sí hay candidatos a nivel nacional.
 // Para Cámara (circunscripciones departamentales) el nivel nacional no incluye candidatos → retorna [].
 function getLiveNationalCandidates(corp){
-  const liveData = corp==='senado' ? API_SE : API_CA;
+  // Cámara: la API nacional no incluye cantotabla por candidato;
+  // se agregan de todas las circunscripciones departamentales (cargadas en background)
+  if(corp==='camara'){
+    if(!API_CA_DEPT_CANDS) return [];
+    return API_CA_DEPT_CANDS.slice(0,10);
+  }
+  // Senado: la API nacional sí incluye cantotabla (circunscripción nacional)
+  const liveData = API_SE;
   if(!liveData) return [];
   const cam = liveData.camaras?.[0];
   if(!cam?.partotabla) return [];
